@@ -24,6 +24,7 @@
 | DT-5 | 图标：应用图标、小图标、托盘图标三套，从一份矢量稿出。施工单 `DT-5-图标.md` | 这里 | 已完成 |
 | DT-6 | 打包和发版：Linux 的 deb、rpm、AUR，Windows 的 NSIS，macOS 的 dmg；钉核心、网页软件的版本。施工单 `DT-6-打包.md` | 这里 | 已完成（Linux、Windows 手测；macOS 等 Mac） |
 | DT-7 | 许可证：照 miyu-im 的 `xtask/src/licenses.rs` 搬一份许可证门禁进 CI（依赖的许可证照名单查，git 钉住的核心、网页 crate 放行 AGPL）；照核心那边 cargo-about 的做法出第三方许可证清单，随安装包发（外壳、核心、网页三份），MPL-2.0 的 `option-ext` 写明 crates.io 的源码地址（发布前审查 2026-10-30 第 9、17 条）；Tauri 带进来的几个不再维护、unsound 的提醒（proc-macro-error、zbus_names、zvariant、zvariant_derive、glib 0.18）记在施工单里，跟着 Tauri 升级 | 这里 | 待做，等核心的 cargo-about 做法定了 |
+| DT-10 | 第五批审计（2026-10-30，审 b94ffd8）的七条：框里的跳转不再叫起系统浏览器（D5-1）、数据目录只给自己看（D5-2）、打包流水线拆开写权限（D5-3）、`PATH` 只认绝对目录（D5-4）、调试口子只在 debug 编译里认（D5-5）、日志轮转和限流（D5-6）、PKGBUILD 注释不被填（D5-7）。施工单 `DT-10-审计.md` | 这里 | 在做 |
 
 ### 三、下一张
 

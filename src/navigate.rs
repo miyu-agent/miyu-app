@@ -1,4 +1,5 @@
-//! 导航、新窗口交给谁（蓝图「怎么走」第 6 条）：只有网页软件的那个来源留在窗口里，别的交系统的浏览器或者不开。
+//! 导航、新窗口交给谁（蓝图「怎么走」第 6 条）：只有网页软件的那个来源留在窗口里；窗口里别的导航不开，只有新窗口交系统的
+//! 浏览器。
 
 use url::Url;
 
@@ -34,23 +35,22 @@ pub enum Go {
     Drop,
 }
 
-/// 窗口里要开 `url`：网页软件的来源、`about:`、`blob:`、`data:` 留下；`http`、`https`、`mailto` 交出去；别的不开。
+/// 窗口里要开 `url`：网页软件的来源、`about:`、`blob:`、`data:` 留下；别的不开，也不交出去（第五批审计 D5-1）：WebKitGTK、
+/// WKWebView 把子框架自己的跳转也交到这里，框里的脚本（产物 HTML、软件后台页）不用人点就能一直跳，交出去就是一直叫起系统
+/// 的浏览器、带着网址出去。往外的链接走 `new_window`。
 pub fn navigation(origin: Option<Origin>, url: &Url) -> Go {
     if origin.is_some_and(|origin| origin.holds(url)) {
         return Go::Stay;
     }
     match url.scheme() {
         "about" | "blob" | "data" => Go::Stay,
-        _ => outside(url),
+        _ => Go::Drop,
     }
 }
 
-/// 页面要开新窗口（`target=_blank`、`window.open`）：一个窗口一份状态，同来源的也交系统的浏览器。
+/// 页面要开新窗口（`target=_blank`、`window.open`）：`http`、`https`、`mailto` 交系统的浏览器（一个窗口一份状态，同来源的
+/// 也交），别的不开。
 pub fn new_window(url: &Url) -> Go {
-    outside(url)
-}
-
-fn outside(url: &Url) -> Go {
     match url.scheme() {
         "http" | "https" | "mailto" => Go::Elsewhere,
         _ => Go::Drop,
