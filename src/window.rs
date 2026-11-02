@@ -59,7 +59,7 @@ pub fn create(
     if let Some(data) = data {
         builder = builder.data_directory(data);
     }
-    if let Some(args) = browser_args(std::env::var("MIYU_DESKTOP_DEBUG_PORT").ok().as_deref()) {
+    if let Some(args) = browser_args(debug_port().as_deref()) {
         log::line(&format!(
             "webview debugging port open for diagnostics: {args}"
         ));
@@ -92,8 +92,18 @@ pub fn first_size(screen_width: f64, screen_height: f64) -> (f64, f64) {
     )
 }
 
-/// 排查用（施工 DT-6，Windows 上查动画）：环境变量 `MIYU_DESKTOP_DEBUG_PORT` 写了 1024 以上的口子，WebView2 开只听本机的
-/// 调试口子（`--remote-debugging-port`）。只有 WebView2 认这个参数，别的网页视图不理。没写、写错的交 `None`，照常不开。
+/// 排查用的调试口子的环境变量 `MIYU_DESKTOP_DEBUG_PORT`：只有 debug 编译认，正式版一律当没写（第五批审计 D5-5：开着的时候
+/// 本机任何进程都连得上 DevTools，在页面里拿设备令牌、替人点「允许」；设成用户级、系统级的环境变量容易忘了关）。
+fn debug_port() -> Option<String> {
+    if cfg!(debug_assertions) {
+        std::env::var("MIYU_DESKTOP_DEBUG_PORT").ok()
+    } else {
+        None
+    }
+}
+
+/// 排查用（施工 DT-6，Windows 上查动画）：`MIYU_DESKTOP_DEBUG_PORT` 写了 1024 以上的口子，WebView2 开只听本机的调试口子
+/// （`--remote-debugging-port`）。只有 WebView2 认这个参数，别的网页视图不理。没写、写错的交 `None`，照常不开。
 /// wry 默认的那一句要一起写上：一给参数就整个换掉。
 pub fn browser_args(port: Option<&str>) -> Option<String> {
     let port: u16 = port?.trim().parse().ok().filter(|p| *p >= 1024)?;
