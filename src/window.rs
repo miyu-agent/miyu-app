@@ -123,7 +123,11 @@ fn go(decision: Go, url: &Url) -> bool {
             false
         }
         Go::Drop => {
-            log::line(&format!("not opening a {} link", url.scheme()));
+            // 框里的脚本能一直跳（D5-1），一分钟只记一行。
+            log::now_and_then(
+                "navigation dropped",
+                &format!("not opening a {} link", url.scheme()),
+            );
             false
         }
     }
