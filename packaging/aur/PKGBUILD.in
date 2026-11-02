@@ -1,4 +1,4 @@
-# Miyu 桌面端的 AUR 包（施工 DT-6）：直接拆发版里的 deb。发版的流水线填 @VERSION@、@SHA256@，传进发版；推到 AUR 由项目主人做。
+# Miyu 桌面端的 AUR 包（施工 DT-6）：直接拆发版里的 deb。发版的流水线填 pkgver、sha256sums 两行，传进发版；推到 AUR 由项目主人做。
 # 带了核心（/usr/bin/miyu），和单独装的 miyu 包冲突。
 pkgname=miyu-desktop-bin
 pkgver=@VERSION@

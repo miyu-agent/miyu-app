@@ -111,7 +111,12 @@ jobs:
         run: |
           deb=$(ls out/*.deb)
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
-          sed -e "s/@VERSION@/$version/" -e "s/@SHA256@/$(sha256sum "$deb" | cut -d' ' -f1)/" packaging/aur/PKGBUILD.in > out/PKGBUILD
+          sum=$(sha256sum "$deb" | cut -d' ' -f1)
+          # 只换这两行（第五批审计 D5-7：原来连注释里的占位符也换了）；换完还有占位符的算错。
+          sed -e "s/^pkgver=@VERSION@\$/pkgver=$version/" -e "s/^sha256sums=('@SHA256@')\$/sha256sums=('$sum')/" packaging/aur/PKGBUILD.in > out/PKGBUILD
+          if grep -nE '@(VERSION|SHA256)@' out/PKGBUILD; then echo "PKGBUILD 里还有没填的占位符"; exit 1; fi
+          grep -qx "pkgver=$version" out/PKGBUILD
+          grep -qx "sha256sums=('$sum')" out/PKGBUILD
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: miyu-desktop-${{ runner.os }}
