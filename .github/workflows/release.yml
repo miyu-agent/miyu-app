@@ -1,5 +1,7 @@
 # 打安装包（施工 DT-6，蓝图 desktop.md「装在哪」）：照 pins.toml 取核心、网页软件编 release，搭好内容，Tauri 打包。
 # step/ 分支、手动触发只打包、传到这次运行的附件里（出包手测）；打 v 开头的 tag 才建发版（预发布，没签名）。
+# 第五批审计 D5-3：编、打包的任务只拿读权限，checkout 不把令牌留在磁盘上（核心、网页、tauri-cli 几百个依赖的构建脚本都在
+# 这个任务里跑）；只有最后传发版的小任务拿写权限，它不检出、不编东西。外部 action 按提交号钉，后面注明是哪个标签。
 name: 打包
 
 on:
@@ -11,10 +13,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   pack:
+    permissions:
+      contents: read
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -28,7 +32,9 @@ jobs:
             config: packaging/windows.json
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: 读钉的版本
         id: pins
         shell: bash
@@ -40,13 +46,15 @@ jobs:
               print(f"{part}-repo={pins[part]['repo']}")
               print(f"{part}-rev={pins[part]['rev']}")
           EOF
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           repository: ${{ steps.pins.outputs.core-repo }}
           ref: ${{ steps.pins.outputs.core-rev }}
           path: _core
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           repository: ${{ steps.pins.outputs.web-repo }}
           ref: ${{ steps.pins.outputs.web-rev }}
           path: _web
@@ -62,7 +70,7 @@ jobs:
           (cd _core && rustup toolchain install)
           (cd _web && rustup toolchain install)
       - name: 取编译缓存
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' }}
           add-rust-environment-hash-key: false
@@ -104,19 +112,47 @@ jobs:
           deb=$(ls out/*.deb)
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
           sed -e "s/@VERSION@/$version/" -e "s/@SHA256@/$(sha256sum "$deb" | cut -d' ' -f1)/" packaging/aur/PKGBUILD.in > out/PKGBUILD
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: miyu-desktop-${{ runner.os }}
           path: out/*
           if-no-files-found: error
           retention-days: 14
+      - name: 留下钉的版本给发版说明
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pins
+          path: dist/pins.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  # 只有这一步拿写权限：下三个平台的附件，建发版、传上去。不检出仓库、不跑别人的代码。
+  release:
+    needs: pack
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: miyu-desktop-*
+          merge-multiple: true
+          path: out
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: pins
+          path: pins
       - name: 传进发版
-        if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
+          ls -la out
           tag="${GITHUB_REF#refs/tags/}"
-          notes="$(printf '没签名的测试版。\n\n%s\n' "$(cat dist/pins.txt)")"
+          notes="$(printf '没签名的测试版。\n\n%s\n' "$(cat pins/pins.txt)")"
           gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --prerelease --title "Miyu 桌面端 $tag" --notes "$notes" || true
           gh release upload "$tag" out/* --clobber
