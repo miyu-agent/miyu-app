@@ -25,14 +25,20 @@ pub fn allow(window: &tauri::WebviewWindow) {
 #[cfg(not(target_os = "linux"))]
 pub fn allow(_window: &tauri::WebviewWindow) {}
 
-/// 替身调的命令：弹一条系统通知，点了把窗口拿回来、叫页面里这一条的 `onclick`。页面能调的只有这一条（`capabilities/`）。
+/// 替身调的命令：弹一条系统通知（`silent` 的不出声），点了把窗口拿回来、叫页面里这一条的 `onclick`。页面能调的只有这一条（`capabilities/`）。
 ///
 /// # Errors
 /// 系统的通知弹不出来，交回原因（替身照它叫 `onerror`）。
 #[cfg(any(windows, target_os = "macos"))]
 #[tauri::command]
-pub fn notify(app: tauri::AppHandle, id: u32, title: String, body: String) -> Result<(), String> {
-    native::show(app, id, title, body).map_err(|error| {
+pub fn notify(
+    app: tauri::AppHandle,
+    id: u32,
+    title: String,
+    body: String,
+    silent: bool,
+) -> Result<(), String> {
+    native::show(app, id, title, body, silent).map_err(|error| {
         crate::log::line(&format!("notification not shown: {error}"));
         error
     })

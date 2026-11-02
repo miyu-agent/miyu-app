@@ -19,6 +19,7 @@
       this.body = options.body == null ? '' : String(options.body);
       this.tag = options.tag == null ? '' : String(options.tag);
       this.icon = options.icon == null ? '' : String(options.icon);
+      this.silent = options.silent === true;
       this.data = options.data;
       this.onclick = null;
       this.onclose = null;
@@ -26,7 +27,7 @@
       this.onshow = null;
       this.id = ++next;
       live.set(this.id, this);
-      internals.invoke('notify', { id: this.id, title: this.title, body: this.body }).then(
+      internals.invoke('notify', { id: this.id, title: this.title, body: this.body, silent: this.silent }).then(
         () => this.fire('show'),
         () => { live.delete(this.id); this.fire('error'); },
       );

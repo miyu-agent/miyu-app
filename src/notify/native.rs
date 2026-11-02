@@ -22,17 +22,24 @@ fn clicked(app: &AppHandle, id: u32) {
     }
 }
 
-/// 弹一条。
+/// 弹一条；`silent` 的 toast 写成静音。
 ///
 /// # Errors
 /// 系统的通知弹不出来。
 #[cfg(windows)]
-pub fn show(app: AppHandle, id: u32, title: String, body: String) -> Result<(), String> {
-    use tauri_winrt_notification::Toast;
+pub fn show(
+    app: AppHandle,
+    id: u32,
+    title: String,
+    body: String,
+    silent: bool,
+) -> Result<(), String> {
+    use tauri_winrt_notification::{Sound, Toast};
     let identifier = app.config().identifier.clone();
     Toast::new(&identifier)
         .title(&title)
         .text1(&body)
+        .sound((!silent).then_some(Sound::Default))
         .on_activated(move |_| {
             clicked(&app, id);
             Ok(())
@@ -41,12 +48,18 @@ pub fn show(app: AppHandle, id: u32, title: String, body: String) -> Result<(), 
         .map_err(|error| error.to_string())
 }
 
-/// 弹一条：等点的那一下会阻塞，放到另一个线程里。
+/// 弹一条：等点的那一下会阻塞，放到另一个线程里。不设声音，`silent` 的本来就不出声。
 ///
 /// # Errors
 /// 不会：弹不出来的记一行日志。
 #[cfg(target_os = "macos")]
-pub fn show(app: AppHandle, id: u32, title: String, body: String) -> Result<(), String> {
+pub fn show(
+    app: AppHandle,
+    id: u32,
+    title: String,
+    body: String,
+    _silent: bool,
+) -> Result<(), String> {
     use mac_notification_sys::{Notification, NotificationResponse, set_application};
     use std::sync::Once;
     static APPLICATION: Once = Once::new();

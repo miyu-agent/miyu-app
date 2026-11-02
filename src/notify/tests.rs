@@ -39,3 +39,10 @@ fn the_stand_in_calls_nothing_but_notify() {
         .collect();
     assert_eq!(calls, ["invoke('notify',"], "{calls:?}");
 }
+
+#[test]
+fn the_stand_in_passes_silent_along() {
+    let script = include_str!("../../resources/notification.js");
+    assert!(script.contains("this.silent = options.silent === true;"));
+    assert!(script.contains("body: this.body, silent: this.silent })"));
+}

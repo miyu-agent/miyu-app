@@ -46,7 +46,7 @@
 7. **下载**（`on_download`）：照网页视图给的建议文件名存进系统的「下载」目录，重名的加「 (1)」「 (2)」；没有名字的叫 `download`。存完不弹东西（和浏览器一样，下载的东西在「下载」目录里）。
 8. **通知**：页面自己照网页的规矩决定什么时候弹（网页 `web.md`「系统通知」，`src/host/notify.js`），外壳让它弹得出来、点了把窗口拿回来（施工 DT-8）：
    - Linux（WebKitGTK）：网页视图自己的通知。外壳接 webkit2gtk 的 `permission-request`，通知的放行，别的（定位、摄像头、麦克风……）一律拒；接 `show-notification`，点了拿回窗口。弹不弹得出来看桌面有没有通知服务。
-   - Windows（WebView2 默认拒绝网页通知的权限）、macOS（WKWebView 没有 `Notification`）：外壳往页面里放一个 `Notification` 的替身（`resources/notification.js`，`initialization_script`）：权限一律 `granted`，`new Notification(标题, {body})` 调命令 `notify`，外壳照应用标识弹系统的通知（Windows 的 toast，MSI 的快捷方式带同一个 AppUserModelID；macOS 的通知中心，第一次系统问要不要让 Miyu 发通知）；点了拿回窗口，再叫页面里那一条的 `onclick`。页面的代码不用改。
+   - Windows（WebView2 默认拒绝网页通知的权限）、macOS（WKWebView 没有 `Notification`）：外壳往页面里放一个 `Notification` 的替身（`resources/notification.js`，`initialization_script`）：权限一律 `granted`，`new Notification(标题, {body, silent})` 调命令 `notify`，外壳照应用标识弹系统的通知（Windows 的 toast，MSI 的快捷方式带同一个 AppUserModelID；macOS 的通知中心，第一次系统问要不要让 Miyu 发通知）；`silent` 的不出声（网页 W-1046：看着别的会话时后台会话的那一种，2026-11-02 项目主人定）：Windows 的 toast 写成静音，macOS 的本来就不带声音；点了拿回窗口，再叫页面里那一条的 `onclick`。页面的代码不用改。
 9. **剪贴板**：照网页视图自己的（`navigator.clipboard`，DT-1 在 Linux 上试过能写）。macOS 上外壳要有带「编辑」那一栏的应用菜单，不然 `⌘C`、`⌘V` 在网页视图里不起作用（Tauri 默认的菜单有）。
 10. **关窗口**：拦下关闭，窗口藏起来，网页视图留着：页面照旧连着核心、照旧收推送、照旧自己弹通知（DT-1：藏着时 `document.hidden` 为真，动画不跑）。macOS 上点程序坞的图标（`Reopen`）把窗口拿回来。
 11. **托盘**：Linux、Windows 用带浅色底板的小图标（深浅任务栏都看得见）；macOS 用单色模板图，系统照菜单栏着色。菜单两项：「显示 Miyu」「退出」。Windows、macOS 左键点图标同「显示 Miyu」；Linux 只有菜单（托盘库在 Linux 上收不到图标的点击）。拿出窗口：显示、取消最小化、放到最前。
