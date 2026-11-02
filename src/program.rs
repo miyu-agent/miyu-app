@@ -23,7 +23,8 @@ pub const STOP_LIMIT: Duration = Duration::from_secs(70);
 /// 出错时带回标准错误的最后几行。
 const TAIL_LINES: usize = 6;
 
-/// 找主程序：`MIYU_PROGRAM` 写了的用它；再看外壳自己所在的目录；再照 `PATH` 找。`exists` 说那个文件在不在。
+/// 找主程序：`MIYU_PROGRAM` 写了的用它；再看外壳自己所在的目录；再照 `PATH` 找，只认里面的绝对目录（第五批审计 D5-4：
+/// 空项、`.`、相对目录照外壳的当前目录解析，图形程序的当前目录说不准）。`exists` 说那个文件在不在。
 pub fn locate(
     program: Option<OsString>,
     own_dir: Option<&Path>,
@@ -37,7 +38,8 @@ pub fn locate(
     let beside = own_dir.map(|dir| dir.join(&name));
     let on_path = path
         .into_iter()
-        .flat_map(|p| std::env::split_paths(&p).collect::<Vec<_>>());
+        .flat_map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
+        .filter(|dir| dir.is_absolute());
     beside
         .into_iter()
         .chain(on_path.map(|dir| dir.join(&name)))

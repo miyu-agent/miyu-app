@@ -38,8 +38,10 @@ fn beside_the_shell_comes_before_the_path() {
 
 #[test]
 fn the_path_is_searched_in_order() {
-    let path = std::env::join_paths(["/a", "/b", "/c"]).unwrap();
-    let wanted = Path::new("/b").join(exe("miyu"));
+    // 绝对目录：Windows 上 `/b` 这种没有盘符的不算绝对，照临时目录拼。
+    let root = std::env::temp_dir();
+    let path = std::env::join_paths([root.join("a"), root.join("b"), root.join("c")]).unwrap();
+    let wanted = root.join("b").join(exe("miyu"));
     let got = locate(None, Some(Path::new("/opt/m")), Some(path), |p| p == wanted);
     assert_eq!(got, Some(wanted));
 }
@@ -162,4 +164,20 @@ fn run_does_not_wait_for_a_child_that_keeps_the_pipe() {
         String::from_utf8_lossy(&got.stdout)
     );
     assert!(started.elapsed() < Duration::from_secs(5));
+}
+
+/// 审计第五轮 D5-4（红）：`PATH` 里的空项、`.`、相对目录照外壳的当前目录解析（图形程序的当前目录说不准：从文件管理器、
+/// 别的程序拉起来时是那边的目录），那里放一个 `miyu` 就被当成主程序调。只该照绝对目录找。
+#[test]
+fn audit5_relative_path_entries_are_not_searched() {
+    let absolute = std::env::temp_dir();
+    let path = std::env::join_paths([
+        Path::new(""),
+        Path::new("."),
+        Path::new("bin"),
+        absolute.as_path(),
+    ])
+    .unwrap();
+    let got = locate(None, None, Some(path), |_| true);
+    assert_eq!(got, Some(absolute.join(exe("miyu"))));
 }
