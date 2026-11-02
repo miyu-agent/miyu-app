@@ -4,6 +4,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod download;
+mod folder;
 mod log;
 #[cfg(target_os = "macos")]
 mod menu;
@@ -79,8 +80,9 @@ fn main() {
     }
 }
 
-/// 外壳自己的数据目录：日志 `desktop.log` 放这里，网页视图的数据放下面的 `webview/`（蓝图「怎么走」第 4、14 条）。交回网页
-/// 视图的那个目录；找不到、建不出的交 `None`，网页视图用 Tauri 默认的地方。
+/// 外壳自己的数据目录：日志 `desktop.log` 放这里，网页视图的数据放下面的 `webview/`（蓝图「怎么走」第 4、15 条）。两个都
+/// 只给自己看（第五批审计 D5-2：`webview/` 里有设备令牌）。交回网页视图的那个目录；找不到、建不出的交 `None`，网页视图用
+/// Tauri 默认的地方。
 fn start_log(app: &AppHandle) -> Option<PathBuf> {
     let dir = match app.path().app_local_data_dir() {
         Ok(dir) => dir,
@@ -89,12 +91,17 @@ fn start_log(app: &AppHandle) -> Option<PathBuf> {
             return None;
         }
     };
-    if let Err(error) = std::fs::create_dir_all(&dir) {
+    if let Err(error) = folder::private(&dir) {
         log::line(&format!("creating {}: {error}", dir.display()));
         return None;
     }
     log::start(dir.join("desktop.log"));
-    Some(dir.join("webview"))
+    let webview = dir.join("webview");
+    // 建不出也照样用：上一级已经只给自己看了，网页视图自己会建。
+    if let Err(error) = folder::private(&webview) {
+        log::line(&format!("creating {}: {error}", webview.display()));
+    }
+    Some(webview)
 }
 
 /// 关窗口：藏起来（macOS「窗口」一栏的「关闭窗口」）。

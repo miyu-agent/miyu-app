@@ -20,6 +20,7 @@
 | `Cargo.toml`、`build.rs`、`tauri.conf.json` | 一个 crate；Tauri 的配置：不打页面进应用（没有 `frontendDist`，窗口开时现给网址），没有 `capabilities/`、`capabilities` 是空的（远程来源的页面没有任何权限），不开 `withGlobalTauri` |
 | `src/main.rs` | 起来：单实例、窗口状态、对话框三个插件，菜单的事件，日志和数据目录，事件循环 |
 | `src/log.rs` | 外壳自己的日志 |
+| `src/folder.rs` | 外壳自己的数据目录只给自己看（Unix 上 0700） |
 | `src/menu.rs` | macOS 的应用菜单 |
 | `src/program.rs` | 找主程序 `miyu`，调它、读一行 JSON、读退出码和标准错误 |
 | `src/window.rs` | 开窗口、要网址、出错的对话框、导航和下载交给谁、藏起来、叫回来 |
@@ -39,7 +40,8 @@
 2. **找主程序**：先看环境变量 `MIYU_PROGRAM`（开发时指到别处，和网页软件找主程序同一个名字）；再看外壳自己所在的目录里有没有 `miyu`（Windows 是 `miyu.exe`）；都没有的照 `PATH` 找。安装包里三样放在同一个目录（「装在哪」）。找不到的弹一个系统对话框「找不到 Miyu 的主程序」，只有「退出」。
 3. **开窗口**：先建窗口（标题 `Miyu`，大小、位置照上次的，`tauri-plugin-window-state`；第一次照主屏的七成五、不小于 1100×760、不超过屏幕的九成，居中（项目主人 2026-10-30：1200×800 在大屏幕上左栏显得太宽）；量不出主屏的 1200×800），网页视图先空着；调 `miyu web --print --format json --ticket`（不开控制台窗口：Windows 上 `CREATE_NO_WINDOW`；最多等 30 秒），拿到网址就导航过去。每次新开窗口现要一次，不存网址、不存票：票一次性，页面用票连上以后自己在这个网页视图里存设备令牌，刷新照它进。
    - 退出码非 0、超时、读不出那一行的：弹对话框，头一句「打不开 Miyu 的页面。」，下面是 `miyu` 标准错误的最后几行（照它的语言）或者超时、读不懂的一句，两个按钮「重试」「退出」。「退出」只退外壳，不叫核心停。
-4. **网页视图的数据**（`localStorage` 里的设备令牌、缓存）放在外壳自己的数据目录（Tauri 的 `data_directory`，在应用标识 `io.github.miyu-agent.desktop` 的目录下），不放进 Miyu 的数据根；卸载外壳不动数据根。
+4. **网页视图的数据**（`localStorage` 里的设备令牌、缓存）放在外壳自己的数据目录（Tauri 的 `data_directory`，在应用标识 `io.github.miyu-agent.desktop` 的目录下），不放进 Miyu 的数据根；卸载外壳不动数据根，也不删这个目录（里面的设备令牌有效期内照样能用，要清的自己删）。
+   - Linux、macOS 上外壳的数据目录和下面的 `webview/` 每次起来都收成 0700，只有自己进得去（2026-11-02，第五批审计 D5-2）：WebKitGTK 照 umask 把存设备令牌的 `localStorage` 文件写成 0644，家目录别人进得去的机器（Debian、老的 Ubuntu 默认 0755）上别的用户读得到，拿去就能以这个人的身份连核心。目录收紧了，里面的文件写成什么权限都无所谓；老装的升级上来也收紧。Windows 的 `%LOCALAPPDATA%` 本来就只给自己。
 5. **页面能碰到的外壳**：没有。不开 Tauri 的进程间通道给远程来源的页面（`capabilities` 里不列 `http://127.0.0.1`），页面里没有 `window.__TAURI__`；不装 opener 插件（它默认接管 `target=_blank` 的点击，DT-1 碰到过），开系统的浏览器直接用 `open` 这个 crate。页面要的东西都照浏览器的写法写，外壳在网页视图外面接住（下面 6 到 9）。要页面多给什么，找网页加在 `served.js` 里，不在外壳里开口子。
 6. **导航**（`on_navigation`）：和页面同一个来源（同协议、同主机、同口子）的放行；`about:blank`、`blob:`、`data:` 照网页视图自己的规矩；别的一律不开：不在窗口里开，也不交系统的浏览器，记一行日志就算了。**新窗口**（`target=_blank`、`window.open`，`on_new_window`）才往外交：`http`、`https`、`mailto` 交给系统的浏览器（邮件程序），同来源的也交（桌面端一个窗口一份状态，网页的「页面自己守的」第 4 条），别的协议不开。
    - 为什么导航不往外交（2026-11-02，第五批审计 D5-1）：WebKitGTK、WKWebView 上 `on_navigation` 不光收主框架的，子框架自己的跳转也收（WebView2 只收主框架的）。模型 `show` 出来的 HTML 产物、软件包的后台页都在框里跑脚本，原来它们给自己的 `location.href` 赋个外部网址，外壳就叫起系统浏览器；拒掉以后框留在原页、脚本接着跑，不用人点就能一直叫（实测 3 秒 104 次），网址里还能带上框里看得到的东西。网页里往外的链接都写了 `target=_blank`，走新窗口这一条；沙盒框没有 `allow-popups`，走不到新窗口；`window.open` 在 WebKitGTK 上默认要人点。所以导航一律不交出去，没写 `target=_blank` 的外链在窗口里点了没反应，算网页的毛病，找网页补。
@@ -95,6 +97,7 @@
 |---|---|
 | `src/navigate/tests.rs` | 同来源放行（口子不同、`localhost` 换 `127.0.0.1` 的都不算同来源）；窗口里看到的外链不开、不交出去（D5-1）；`javascript:`、`file:` 这些不开；新窗口一律交出去 |
 | `src/program/tests.rs` | 找主程序的顺序；读那一行 JSON：多一个字段照读，少 `url` 的、不是 `http://127.0.0.1` 的算出错；退出码非 0 带回标准错误的最后几行；调的程序超时杀掉 |
+| `src/folder/tests.rs` | 数据目录连上级一起建；Unix 上新建的、本来开着的都是 0700 |
 | `src/download/tests.rs` | 重名加编号；没有名字的；名字里带路径分隔符、`..` 的只取最后一段 |
 | `src/text/tests.rs` | 三份字的键一样多，没有空的；代码用的键都在；系统语言挑哪一份 |
 | CI 三平台 | 编译、clippy `-D warnings`、测试；每个 `.rs` 不超过 500 行 |
