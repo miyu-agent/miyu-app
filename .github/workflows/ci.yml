@@ -1,4 +1,6 @@
 # 三平台 CI（照网页仓库的那一份）：格式、clippy、测试、行数。Linux 先装 Tauri 要的系统库（WebKitGTK、托盘）。
+# 第五批审计 D5-3 复核：和 release.yml 的打包共用 rust-cache 的缓存，外部 action 同样按提交号钉、checkout 不留令牌，
+# 免得浮动标签被换掉以后弄脏缓存、经缓存进到发版包里。
 name: CI
 
 on:
@@ -19,7 +21,9 @@ jobs:
         os: [ubuntu-24.04, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: 装 Tauri 要的系统库
         if: runner.os == 'Linux'
         run: |
@@ -28,7 +32,7 @@ jobs:
       - name: 装上 rust-toolchain.toml 钉住的工具链
         run: rustup toolchain install
       - name: 取编译缓存
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
           add-rust-environment-hash-key: false
@@ -46,7 +50,7 @@ jobs:
           if [ -n "$over" ]; then echo "超过 500 行：" && echo "$over" && exit 1; fi
       - name: 正式版（试验用，收下程序手测）
         run: cargo build --release --locked
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: miyu-desktop-${{ runner.os }}
           path: |
