@@ -1,4 +1,5 @@
-//! 调装在旁边的主程序 `miyu`（蓝图「它是什么」那张表、「怎么走」第 2、3、12 条）：外壳不连核心，只调它。
+//! 调装在旁边的主程序 `miyu`（图纸 `app.md`「它是什么」）：打开网页界面、设置，叫核心停，问版本。托盘自己只连核心看状态，
+//! 别的事都交给它。
 
 use std::ffi::OsString;
 use std::io::Read;
@@ -8,18 +9,24 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use url::Url;
-
-use crate::navigate::Origin;
-
-/// 开窗口时要网址的那一句。
-pub const OPEN: &[&str] = &["web", "--print", "--format", "json", "--ticket"];
-/// 彻底退出时叫核心停的那一句。
+/// 用浏览器打开网页界面（`miyu web`：核心、网页服务没在跑的由它拉起，带交接票交给系统的浏览器）。
+pub const WEB: &[&str] = &["web"];
+/// 用浏览器打开网页的设置（网页 W-1085 加的参数；旧网页不认，见 [`USAGE`]）。
+pub const SETTINGS: &[&str] = &["web", "--settings"];
+/// 叫核心停（核心 CL-4）：网页服务、软件包跟着停。
 pub const STOP: &[&str] = &["core", "stop"];
-/// 要网址最多等多久：第一次要先拉起核心和网页软件。
-pub const OPEN_LIMIT: Duration = Duration::from_secs(30);
+/// 核心进程本身：头照 `miyu core` 把它拉起来（核心的 `connect_or_start`）。
+pub const CORE: &str = "core";
+/// 问主程序的版本。
+pub const VERSION: &[&str] = &["--version"];
+/// 打开网页最多等多久：第一次要先拉起核心和网页软件（核心等它起来最多 60 秒）。
+pub const WEB_LIMIT: Duration = Duration::from_secs(90);
 /// 叫核心停最多等多久：`miyu core stop` 自己最多等 60 秒。
 pub const STOP_LIMIT: Duration = Duration::from_secs(70);
+/// 问版本最多等多久。
+pub const VERSION_LIMIT: Duration = Duration::from_secs(10);
+/// 用法不对的退出码：网页包的 `open` 不认的参数照它退（网页 `main.rs` 的 `USAGE`），`miyu web` 原样转回来。
+pub const USAGE: i32 = 2;
 /// 出错时带回标准错误的最后几行。
 const TAIL_LINES: usize = 6;
 
@@ -163,35 +170,6 @@ fn no_console(command: &mut Command) {
 
 #[cfg(not(windows))]
 fn no_console(_: &mut Command) {}
-
-/// 要网址没要成。
-#[derive(Debug, PartialEq, Eq)]
-pub enum OpenError {
-    /// 退出码不是 0：带回标准错误的最后几行。
-    Failed(String),
-    /// 回的那一行读不懂。
-    BadReply,
-}
-
-/// 读 `miyu web --print --format json --ticket` 跑完的结果：退出码 0、第一行是 `{"url": …}`，网址是网页软件的来源。
-///
-/// # Errors
-/// 见 [`OpenError`]。
-pub fn read_open(ran: &Ran) -> Result<(Url, Origin), OpenError> {
-    if ran.code != Some(0) {
-        return Err(OpenError::Failed(tail(&ran.stderr)));
-    }
-    let text = String::from_utf8_lossy(&ran.stdout);
-    let line = text.lines().next().ok_or(OpenError::BadReply)?;
-    #[derive(serde::Deserialize)]
-    struct Reply {
-        url: String,
-    }
-    let reply: Reply = serde_json::from_str(line).map_err(|_| OpenError::BadReply)?;
-    let url: Url = reply.url.parse().map_err(|_| OpenError::BadReply)?;
-    let origin = Origin::of(&url).ok_or(OpenError::BadReply)?;
-    Ok((url, origin))
-}
 
 /// 标准错误的最后几行（`miyu` 照人的语言说的那几句），去掉空行。
 pub fn tail(stderr: &[u8]) -> String {

@@ -1,32 +1,37 @@
 [package]
-name = "miyu-desktop"
+name = "miyu-app"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.97"
 license = "AGPL-3.0-or-later"
-description = "Miyu 的桌面端：Tauri 窗口开网页软件给的本机页面，外加托盘"
+description = "Miyu 的托盘程序：常驻的托盘图标，起停核心、用浏览器打开网页界面"
 publish = false
 
-# Tauri 和插件钉死版本：网页视图、托盘的行为跟着它们变，升级单独做一步、三个平台再手测一遍。
-[build-dependencies]
-tauri-build = { version = "=2.7.4", features = [] }
-
+# 托盘、事件循环、对话框钉死版本：托盘和菜单的行为跟着它们变，升级单独做一步、三个平台再手测一遍。
+# tray-icon、tao 是 Tauri 自己用的托盘和事件循环（施工 AP-2：Tauri 换成它们，不要网页视图）。
 [dependencies]
-tauri = { version = "=2.12.5", features = ["tray-icon", "image-png"] }
-tauri-plugin-single-instance = "=2.5.5"
-tauri-plugin-window-state = "=2.5.0"
-tauri-plugin-dialog = "=2.8.4"
-open = "5.4"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-sys-locale = "0.3"
-toml = "0.8"
-url = "2"
+tao = { version = "=0.37.2", default-features = false }
+tray-icon = "=0.26.1"
+# 系统原生的消息框（关于、出错）。Linux 上用 GTK 画（tao 本来就要 GTK），不用默认的 xdg 门户那一套。
+rfd = { version = "=0.17.2", default-features = false, features = ["gtk3"] }
+# 盯数据根的 `run/`（别人把核心拉起来了）、单实例「请打开」的文件。
+notify = "8.2.1"
+# 编进程序的 PNG 解成托盘库要的 RGBA。
+png = "0.18.1"
+# 用系统的文件管理器打开日志的文件夹。
+open = "5.4.5"
+serde_json = "1.0.154"
+sys-locale = "0.3.2"
+# 连核心（门面 miyu-client 的 `connect`）要的异步运行时。
+tokio = { version = "1.54.1", features = ["io-util", "rt", "sync", "time"] }
+toml = "1.1.8"
+# 核心照 git 依赖钉住一个提交（同网页仓库的做法、同 pins.toml 的核心）：升级就是改这里的 rev 和 pins.toml、过三台 CI。
+# 只经门面用：找数据根、资源目录，连核心，拉起核心。
+miyu-client = { git = "https://github.com/miyu-agent/miyu", rev = "7783ce2c082b4993bfb39cc83bb5ca5bc1aa22d8" }
 
-# Linux 的网页视图（WebKitGTK）：放行通知的权限、接住点通知（蓝图「怎么走」第 8 条）。和 Tauri 用的同一版。
-[target.'cfg(target_os = "linux")'.dependencies]
-webkit2gtk = { version = "=2.0.2", features = ["v2_40"] }
-glib = "0.18"
+# 「开机时启动」写当前用户的 Run 注册表项。
+[target.'cfg(windows)'.dependencies]
+winreg = "0.56.0"
 
 [lints.rust]
 unsafe_code = "forbid"

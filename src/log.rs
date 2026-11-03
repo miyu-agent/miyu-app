@@ -1,6 +1,7 @@
-//! 外壳自己的日志（蓝图「怎么走」第 15 条）：一行一条，写进它的数据目录里的 `desktop.log`。只记起来、要网址的耗时和
-//! 结果、调 `miyu` 失败、退出；不记网址（里面有票）。还没定下目录之前、写不进去的，写到标准错误上。
-//! 文件到 1 MiB 挪成 `desktop.log.1`（只留一份旧的）；页面推得动的事（不开的导航）同一种一分钟只记一行（第五批审计 D5-6）。
+//! 托盘自己的日志（图纸 `app.md` 第 6 条）：一行一条，写进数据根的 `var/log/miyu-app.log`，和核心、网页的日志放在一起（菜单
+//! 「打开日志所在的文件夹」打开的就是那里）。只记起来、调 `miyu` 的结果和耗时、连核心的变化、退出。数据根的 `var/log/` 由核心建：
+//! 还没有的（核心没起过）先写到标准错误上，等连上核心再定下文件（[`start`] 只认第一次）。
+//! 文件到 1 MiB 挪成 `miyu-app.log.1`（只留一份旧的）；会一下来很多的事同一种一分钟只记一行（原来外壳第五批审计 D5-6）。
 
 use std::ffi::OsString;
 use std::fs::OpenOptions;
@@ -28,6 +29,11 @@ pub fn start(path: PathBuf) {
     }
 }
 
+/// 日志文件定下了没有。
+pub fn is_started() -> bool {
+    FILE.get().is_some()
+}
+
 /// 记一行：前面是 Unix 时间（秒，三位小数）。
 pub fn line(message: &str) {
     let now = SystemTime::now()
@@ -52,7 +58,7 @@ pub fn line(message: &str) {
     }
 }
 
-/// 页面推得动的事记一行：同一种（`kind`）`QUIET_FOR` 里只记第一次，下次记的时候带上中间没记的次数。
+/// 会一下来很多的事记一行：同一种（`kind`）`QUIET_FOR` 里只记第一次，下次记的时候带上中间没记的次数。
 pub fn now_and_then(kind: &'static str, message: &str) {
     let allowed = QUIET
         .lock()
@@ -78,7 +84,7 @@ fn rotate(path: &Path, limit: u64) -> io::Result<()> {
     }
 }
 
-/// 旧的那一份：`desktop.log` → `desktop.log.1`。
+/// 旧的那一份：`miyu-app.log` → `miyu-app.log.1`。
 fn old(path: &Path) -> PathBuf {
     let mut name = OsString::from(path.as_os_str());
     name.push(".1");

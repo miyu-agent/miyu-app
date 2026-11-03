@@ -1,4 +1,5 @@
-# 三平台 CI（照网页仓库的那一份）：格式、clippy、测试、行数。Linux 先装 Tauri 要的系统库（WebKitGTK、托盘）。
+# 三平台 CI（照网页仓库的那一份）：格式、clippy、测试、行数。Linux 先装托盘要的系统库（GTK 3、AppIndicator；施工 AP-2 起
+# 不再要 WebKitGTK）。
 # 第五批审计 D5-3 复核：和 release.yml 的打包共用 rust-cache 的缓存，外部 action 同样按提交号钉、checkout 不留令牌，
 # 免得浮动标签被换掉以后弄脏缓存、经缓存进到发版包里。
 name: CI
@@ -24,11 +25,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: 装 Tauri 要的系统库
+      - name: 装托盘要的系统库
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+          sudo apt-get install -y libgtk-3-dev libayatana-appindicator3-dev
       - name: 装上 rust-toolchain.toml 钉住的工具链
         run: rustup toolchain install
       - name: 取编译缓存
@@ -52,9 +53,9 @@ jobs:
         run: cargo build --release --locked
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: miyu-desktop-${{ runner.os }}
+          name: miyu-app-${{ runner.os }}
           path: |
-            target/release/miyu-desktop
-            target/release/miyu-desktop.exe
+            target/release/miyu-app
+            target/release/miyu-app.exe
           if-no-files-found: error
           retention-days: 14

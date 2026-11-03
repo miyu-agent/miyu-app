@@ -1,0 +1,84 @@
+use super::*;
+
+/// 路径照 Unix 的写法（Windows 上 `/x` 不算绝对路径）。
+#[cfg(unix)]
+#[test]
+fn the_linux_file_follows_xdg_config_home() {
+    assert_eq!(
+        desktop_file(Some("/x/conf".into()), Some("/home/u".into())),
+        Some(PathBuf::from("/x/conf/autostart/miyu-app.desktop"))
+    );
+    assert_eq!(
+        desktop_file(None, Some("/home/u".into())),
+        Some(PathBuf::from("/home/u/.config/autostart/miyu-app.desktop"))
+    );
+    // 相对的 XDG_CONFIG_HOME 不认（规范：只认绝对路径）。
+    assert_eq!(
+        desktop_file(Some("conf".into()), Some("/home/u".into())),
+        Some(PathBuf::from("/home/u/.config/autostart/miyu-app.desktop"))
+    );
+    assert_eq!(desktop_file(None, None), None);
+}
+
+#[test]
+fn the_desktop_entry_starts_the_tray_without_a_browser() {
+    let entry = desktop_entry(Path::new("/usr/bin/miyu-app"));
+    assert!(entry.starts_with("[Desktop Entry]\n"));
+    assert!(entry.contains("\nExec=/usr/bin/miyu-app --autostart\n"));
+    assert!(entry.contains("\nType=Application\n"));
+    assert!(entry.contains("\nName=Miyu\n"));
+}
+
+#[test]
+fn awkward_program_paths_are_quoted() {
+    assert_eq!(
+        desktop_exec("/opt/My Apps/miyu-app"),
+        "\"/opt/My Apps/miyu-app\""
+    );
+    assert_eq!(desktop_exec("/opt/$x/miyu-app"), "\"/opt/\\\\$x/miyu-app\"");
+    assert_eq!(desktop_exec("/opt/100%/miyu-app"), "/opt/100%%/miyu-app");
+}
+
+#[cfg(unix)]
+#[test]
+fn the_launch_agent_file_is_in_the_home() {
+    assert_eq!(
+        launch_agent_file(Some("/Users/u".into())),
+        Some(PathBuf::from(
+            "/Users/u/Library/LaunchAgents/io.github.miyu-agent.app.plist"
+        ))
+    );
+    assert_eq!(launch_agent_file(None), None);
+}
+
+#[test]
+fn the_launch_agent_runs_at_login_with_the_argument() {
+    let plist = launch_agent(Path::new(
+        "/Applications/Miyu & Co.app/Contents/MacOS/miyu-app",
+    ));
+    assert!(plist.contains("<string>io.github.miyu-agent.app</string>"));
+    assert!(plist.contains(
+        "<string>/Applications/Miyu &amp; Co.app/Contents/MacOS/miyu-app</string>\n    <string>--autostart</string>"
+    ));
+    assert!(plist.contains("<key>RunAtLoad</key>\n  <true/>"));
+}
+
+#[test]
+fn the_run_value_quotes_the_program() {
+    assert_eq!(
+        run_value(Path::new(r"C:\Program Files\Miyu\miyu-app.exe")),
+        r#""C:\Program Files\Miyu\miyu-app.exe" --autostart"#
+    );
+}
+
+#[test]
+fn removing_what_is_not_there_is_fine_and_writing_makes_the_folder() {
+    let dir = std::env::temp_dir().join(format!("miyu-app-autostart-{}", std::process::id()));
+    let file = dir.join("a").join("miyu-app.desktop");
+    remove(&file).unwrap();
+    write(&file, "x").unwrap();
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), "x");
+    remove(&file).unwrap();
+    assert!(!file.exists());
+    std::fs::remove_dir_all(&dir).unwrap();
+}

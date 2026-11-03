@@ -1,51 +1,36 @@
-//! 彻底退出（蓝图「怎么走」第 12 条）：托盘「退出」、macOS 的「退出 Miyu」（`⌘Q`）。先藏窗口、拿掉托盘图标，调
-//! `miyu core stop` 叫核心停，再退出外壳；核心没停成照样退。网页软件不管，它照自己的规矩空闲了退。
+//! 叫核心停（图纸 `app.md` 第 4 条「停止」「退出 Miyu」，原来外壳的彻底退出）：调 `miyu core stop`，网页服务、软件包跟着停。
+//! 它最多等 60 秒；退出码 1 的标准错误上有一句「miyu: …」，照它的语言，带回去给人看。
+//! 「退出 Miyu」没停成的照样退，记一行日志；网页软件不管，核心停了以后它照自己的规矩空闲了退。
 
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::path::Path;
 
-use tauri::{AppHandle, Manager};
-
+use crate::log;
 use crate::program::{self, RunError};
-use crate::{log, tray, window};
+use crate::text::{Text, key};
 
-static QUITTING: AtomicBool = AtomicBool::new(false);
-
-/// 连核心一起退。点了两次的只算一次。
-pub fn everything(app: &AppHandle, miyu: Option<PathBuf>) {
-    if QUITTING.swap(true, Ordering::SeqCst) {
-        return;
-    }
-    log::line("quitting with the core");
-    if let Some(window) = app.get_webview_window(window::LABEL)
-        && let Err(error) = window.hide()
-    {
-        log::line(&format!("hiding the window: {error}"));
-    }
-    if app.remove_tray_by_id(tray::ID).is_none() {
-        log::line("no tray icon to remove");
-    }
-    let app = app.clone();
-    std::thread::spawn(move || {
-        match miyu {
-            Some(miyu) => stop_core(&miyu),
-            None => log::line("main program not found, the core is left alone"),
+/// 叫核心停。停了（或者本来就没在跑）交 `Ok`；没停成交给人看的一句。
+///
+/// # Errors
+/// 没停成：`miyu` 说的那几句、超时、起不来。
+pub fn stop_core(miyu: &Path, text: &Text) -> Result<(), String> {
+    let got = program::run(miyu, program::STOP, program::STOP_LIMIT);
+    match &got {
+        Ok(ran) if ran.code == Some(0) => {
+            log::line("core stopped");
+            Ok(())
         }
-        app.exit(0);
-    });
-}
-
-fn stop_core(miyu: &std::path::Path) {
-    match program::run(miyu, program::STOP, program::STOP_LIMIT) {
-        Ok(ran) if ran.code == Some(0) => log::line("core stopped"),
-        Ok(ran) => log::line(&format!(
-            "core stop exited {:?}: {}",
-            ran.code,
-            program::tail(&ran.stderr)
-        )),
-        Err(RunError::Timeout) => log::line("core stop timed out"),
+        Ok(ran) => {
+            let said = program::tail(&ran.stderr);
+            log::line(&format!("core stop exited {:?}: {said}", ran.code));
+            Err(said)
+        }
+        Err(RunError::Timeout) => {
+            log::line("core stop timed out");
+            Err(text.get(key::TIMEOUT).to_owned())
+        }
         Err(RunError::Spawn(error) | RunError::Wait(error)) => {
-            log::line(&format!("core stop: {error}"))
+            log::line(&format!("core stop: {error}"));
+            Err(error.to_string())
         }
     }
 }

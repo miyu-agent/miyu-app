@@ -1,55 +1,67 @@
-//! 外壳自己给人看的字（蓝图「怎么走」第 13 条）：托盘菜单、应用菜单、对话框。照系统的语言挑一份，中文、日文、英文，
-//! 别的用英文；不问核心的 `ui.language`（外壳不连核心）。三份住在 `resources/text/`，编进程序。
+//! 托盘自己给人看的字（图纸 `app.md` 第 4 条）：托盘菜单、对话框。照系统的语言挑一份，中文、日文、英文，别的用英文；不问核心的
+//! `ui.language`（托盘起来时核心不一定在跑）。三份住在 `resources/text/`，编进程序。
 
 use std::collections::BTreeMap;
 
 /// 代码里用的键。
 pub mod key {
-    pub const TRAY_SHOW: &str = "tray.show";
-    pub const TRAY_QUIT: &str = "tray.quit";
-    #[cfg_attr(
-        not(target_os = "macos"),
-        allow(dead_code, reason = "只有 macOS 的应用菜单用")
-    )]
-    pub const MENU_QUIT: &str = "menu.quit";
-    #[cfg_attr(
-        not(target_os = "macos"),
-        allow(dead_code, reason = "只有 macOS 的应用菜单用")
-    )]
-    pub const MENU_EDIT: &str = "menu.edit";
-    #[cfg_attr(
-        not(target_os = "macos"),
-        allow(dead_code, reason = "只有 macOS 的应用菜单用")
-    )]
-    pub const MENU_WINDOW: &str = "menu.window";
-    #[cfg_attr(
-        not(target_os = "macos"),
-        allow(dead_code, reason = "只有 macOS 的应用菜单用")
-    )]
-    pub const MENU_CLOSE: &str = "menu.close";
+    pub const STATUS_RUNNING: &str = "status.running";
+    pub const STATUS_STARTING: &str = "status.starting";
+    pub const STATUS_STOPPING: &str = "status.stopping";
+    pub const STATUS_STOPPED: &str = "status.stopped";
+    pub const STATUS_UNRESPONSIVE: &str = "status.unresponsive";
+    pub const STATUS_FAILED: &str = "status.failed";
+    pub const STOP: &str = "menu.stop";
+    pub const START: &str = "menu.start";
+    pub const RESTART: &str = "menu.restart";
+    pub const OPEN: &str = "menu.open";
+    pub const SETTINGS: &str = "menu.settings";
+    pub const AUTOSTART: &str = "menu.autostart";
+    pub const LOGS: &str = "menu.logs";
+    pub const ABOUT: &str = "menu.about";
+    pub const QUIT: &str = "menu.quit";
     pub const NO_PROGRAM: &str = "error.no_program";
-    pub const OPEN: &str = "error.open";
+    pub const OPEN_FAILED: &str = "error.open";
+    pub const START_FAILED: &str = "error.start";
+    pub const STOP_FAILED: &str = "error.stop";
+    pub const AUTOSTART_FAILED: &str = "error.autostart";
+    pub const LOGS_FAILED: &str = "error.logs";
     pub const TIMEOUT: &str = "error.timeout";
-    pub const BAD_REPLY: &str = "error.bad_reply";
-    pub const RETRY: &str = "button.retry";
-    pub const QUIT: &str = "button.quit";
+    pub const ABOUT_APP: &str = "about.app";
+    pub const ABOUT_CORE: &str = "about.core";
+    pub const ABOUT_WEB: &str = "about.web";
+    pub const ABOUT_UNKNOWN: &str = "about.unknown";
 }
 
 /// 上面每一个键，测试查三份里都有。
 #[cfg(test)]
-const KEYS: [&str; 12] = [
-    key::TRAY_SHOW,
-    key::TRAY_QUIT,
-    key::MENU_QUIT,
-    key::MENU_EDIT,
-    key::MENU_WINDOW,
-    key::MENU_CLOSE,
-    key::NO_PROGRAM,
+const KEYS: [&str; 26] = [
+    key::STATUS_RUNNING,
+    key::STATUS_STARTING,
+    key::STATUS_STOPPING,
+    key::STATUS_STOPPED,
+    key::STATUS_UNRESPONSIVE,
+    key::STATUS_FAILED,
+    key::STOP,
+    key::START,
+    key::RESTART,
     key::OPEN,
-    key::TIMEOUT,
-    key::BAD_REPLY,
-    key::RETRY,
+    key::SETTINGS,
+    key::AUTOSTART,
+    key::LOGS,
+    key::ABOUT,
     key::QUIT,
+    key::NO_PROGRAM,
+    key::OPEN_FAILED,
+    key::START_FAILED,
+    key::STOP_FAILED,
+    key::AUTOSTART_FAILED,
+    key::LOGS_FAILED,
+    key::TIMEOUT,
+    key::ABOUT_APP,
+    key::ABOUT_CORE,
+    key::ABOUT_WEB,
+    key::ABOUT_UNKNOWN,
 ];
 
 /// 一种语言。

@@ -1,115 +1,134 @@
-//! Miyu 的桌面端外壳（蓝图 `docs/blueprint/desktop.md`）：一个窗口开网页软件给的本机页面，一个托盘图标。外壳不连核心，
-//! 只调装在旁边的主程序 `miyu`：开窗口时要网址，彻底退出时叫核心停。
+//! Miyu 的托盘程序 `miyu-app`（图纸 `docs/blueprint/app.md`）：只有托盘图标（macOS 上是菜单栏图标），没有窗口。界面都在网页里，
+//! 托盘调装在旁边的主程序 `miyu` 用浏览器打开它；另照网页服务的样子连核心（不拉起），看它在不在跑。
 // 正式版不开控制台窗口（Windows）。
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod download;
+mod about;
+mod actions;
+mod app;
+mod autostart;
 mod folder;
+mod icon;
+mod instance;
+mod link;
 mod log;
-#[cfg(target_os = "macos")]
-mod menu;
-mod navigate;
-mod notify;
 mod program;
 mod quit;
+mod status;
 mod text;
 mod tray;
-mod window;
 
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use tauri::{AppHandle, Manager};
-use tauri_plugin_window_state::StateFlags;
+use miyu_client::places::{DataRoot, Env};
+use tao::event::{Event as LoopEvent, StartCause};
+use tao::event_loop::{ControlFlow, EventLoopBuilder};
 
+use crate::actions::Ctx;
+use crate::app::{App, Event, Post};
+use crate::instance::Claim;
 use crate::text::Text;
 
 fn main() {
     let text = Arc::new(Text::system());
-    let miyu = program::locate_here();
-    let known: window::Known = Arc::new(Mutex::new(None));
-    let on_menu = miyu.clone();
-    let built = tauri::Builder::default()
-        // 单实例要第一个注册：第二次开程序只叫已经在跑的那一个把窗口拿出来（蓝图「怎么走」第 1 条）。
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            window::bring_back(app)
-        }))
-        // 只记大小、位置、最大化；「藏着」不记，不然下次起来窗口不出来。
-        .plugin(
-            tauri_plugin_window_state::Builder::new()
-                .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED)
-                .build(),
-        )
-        .plugin(tauri_plugin_dialog::init())
-        .on_menu_event(move |app, event| match event.id().as_ref() {
-            tray::SHOW => window::bring_back(app),
-            tray::QUIT => quit::everything(app, on_menu.clone()),
-            #[cfg(target_os = "macos")]
-            menu::CLOSE => hide(app),
-            other => log::line(&format!("unknown menu item {other}")),
-        })
-        .setup(move |app| {
-            let handle = app.handle();
-            let data = start_log(handle);
-            log::line(&format!(
-                "starting {}, main program found: {}",
-                env!("CARGO_PKG_VERSION"),
-                miyu.is_some()
-            ));
-            #[cfg(target_os = "macos")]
-            handle.set_menu(menu::create(handle, &text)?)?;
-            window::create(handle, &known, data)?;
-            if let Err(error) = tray::create(handle, &text) {
-                log::line(&format!("no tray icon: {error}"));
-            }
-            window::open(handle, &known, miyu.clone(), Arc::clone(&text));
-            Ok(())
-        })
-        .build(tauri::generate_context!());
-    match built {
-        Ok(app) => app.run(|_app, _event| {
-            #[cfg(target_os = "macos")]
-            if let tauri::RunEvent::Reopen { .. } = _event {
-                window::bring_back(_app);
-            }
-        }),
+    let autostarted = std::env::args().skip(1).any(|arg| arg == autostart::ARG);
+    let root = match DataRoot::locate(&Env::current()) {
+        Ok(root) => Some(root),
         Err(error) => {
-            log::line(&format!("could not start: {error}"));
-            std::process::exit(1);
-        }
-    }
-}
-
-/// 外壳自己的数据目录：日志 `desktop.log` 放这里，网页视图的数据放下面的 `webview/`（蓝图「怎么走」第 4、15 条）。两个都
-/// 只给自己看（第五批审计 D5-2：`webview/` 里有设备令牌）。交回网页视图的那个目录；找不到、建不出的交 `None`，网页视图用
-/// Tauri 默认的地方。
-fn start_log(app: &AppHandle) -> Option<PathBuf> {
-    let dir = match app.path().app_local_data_dir() {
-        Ok(dir) => dir,
-        Err(error) => {
-            log::line(&format!("no data folder: {error}"));
-            return None;
+            log::line(&format!("no data root: {error}"));
+            None
         }
     };
-    if let Err(error) = folder::private(&dir) {
-        log::line(&format!("creating {}: {error}", dir.display()));
-        return None;
-    }
-    log::start(dir.join("desktop.log"));
-    let webview = dir.join("webview");
-    // 建不出也照样用：上一级已经只给自己看了，网页视图自己会建。
-    if let Err(error) = folder::private(&webview) {
-        log::line(&format!("creating {}: {error}", webview.display()));
-    }
-    Some(webview)
-}
-
-/// 关窗口：藏起来（macOS「窗口」一栏的「关闭窗口」）。
-#[cfg(target_os = "macos")]
-fn hide(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(window::LABEL)
-        && let Err(error) = window.hide()
+    // 数据根的 `var/log/` 核心起过一次才有；没有的等连上核心再定（`app::start_log`）。
+    if let Some(logs) = root.as_ref().map(DataRoot::logs)
+        && logs.is_dir()
     {
-        log::line(&format!("hiding the window: {error}"));
+        log::start(logs.join("miyu-app.log"));
     }
+    log::line(&format!(
+        "starting {}, autostarted: {autostarted}",
+        env!("CARGO_PKG_VERSION")
+    ));
+
+    // 单实例：一个数据根一个托盘。第二个起来的叫第一个打开网页界面，自己退。
+    let own = folder::own_here();
+    let key = instance::key(
+        root.as_ref()
+            .map_or(std::path::Path::new(""), DataRoot::path),
+    );
+    let _held = match own.as_deref().map(|dir| (dir, instance::claim(dir, &key))) {
+        Some((_, Ok(Claim::First(lock)))) => Some(lock),
+        Some((dir, Ok(Claim::Second))) => {
+            if autostarted {
+                log::line("already running, autostart does nothing");
+            } else if let Err(error) = instance::ask(dir, &key) {
+                log::line(&format!("could not ask the running tray to open: {error}"));
+            } else {
+                log::line("already running, asked it to open the web interface");
+            }
+            return;
+        }
+        Some((dir, Err(error))) => {
+            log::line(&format!("no single instance in {}: {error}", dir.display()));
+            None
+        }
+        None => {
+            log::line("no folder of our own, no single instance");
+            None
+        }
+    };
+
+    #[cfg_attr(
+        not(target_os = "macos"),
+        allow(unused_mut, reason = "只有 macOS 要改")
+    )]
+    let mut event_loop = EventLoopBuilder::<Event>::with_user_event().build();
+    // macOS：不占程序坞、不出应用菜单，只在菜单栏（打包时的 `LSUIElement` 是 AP-5 的事，这里先在运行时设）。
+    #[cfg(target_os = "macos")]
+    {
+        use tao::platform::macos::{ActivationPolicy, EventLoopExtMacOS};
+        event_loop.set_activation_policy(ActivationPolicy::Accessory);
+    }
+    let post = Post::new(event_loop.create_proxy());
+    let on_tray = post.clone();
+    tray_icon::TrayIconEvent::set_event_handler(Some(move |event| {
+        on_tray.send(Event::Tray(event));
+    }));
+    let on_menu = post.clone();
+    tray_icon::menu::MenuEvent::set_event_handler(Some(
+        move |event: tray_icon::menu::MenuEvent| {
+            on_menu.send(Event::Menu(event.id));
+        },
+    ));
+
+    let _listening = own.as_deref().and_then(|dir| {
+        let asked = post.clone();
+        instance::listen(dir, &key, move || asked.send(Event::Open))
+            .inspect_err(|error| log::line(&format!("not listening for a second start: {error}")))
+            .ok()
+    });
+    let on_link = post.clone();
+    let waker = root
+        .clone()
+        .map(|root| link::spawn(root, move |up| on_link.send(Event::Link(up))));
+    let miyu = program::locate_here();
+    log::line(&format!("main program found: {}", miyu.is_some()));
+    let ctx = Ctx {
+        miyu,
+        root,
+        text,
+        post,
+        waker,
+    };
+    let mut app = App::new(ctx, !autostarted);
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Wait;
+        match event {
+            LoopEvent::NewEvents(StartCause::Init) => app.started(),
+            LoopEvent::UserEvent(event) => app.handle(event, control_flow),
+            #[cfg(target_os = "macos")]
+            LoopEvent::Reopen { .. } => app.handle(Event::Open, control_flow),
+            _ => {}
+        }
+    });
 }
