@@ -12,7 +12,7 @@
 
 ### 做了什么
 
-1. 改名：crate、程序 `miyu-app`；托盘提示、安装包产品名、消息框标题写「Miyu」。CI、打包流水线的附件名，`packaging/` 三个平台的主页，Linux 包名（`productName` `miyu-app`）、桌面文件模板（`packaging/linux/miyu-app.desktop`），AUR 包 `miyu-app-bin`（`replaces`、`conflicts` 旧的 `miyu-desktop-bin`），`tauri.conf.json` 的 `identifier` 换成 `io.github.miyu-agent.app`、加 `mainBinaryName: miyu-app`，README、AGENTS 照改，仓库地址写 `miyu-agent/miyu-app`。
+1. 改名：crate、程序 `miyu-app`；托盘提示、安装包产品名、消息框标题写「Miyu」。CI、打包流水线的附件名，`packaging/` 三个平台的主页，Linux 包名（`productName` `miyu-app`）、桌面文件模板（`packaging/linux/miyu-app.desktop`），AUR 包 `miyu-app-bin`（`replaces`、`conflicts` 旧的 `miyu-desktop-bin`），`tauri.conf.json` 的 `identifier` 换成 `io.github.miyu-agent.miyu-app`、加 `mainBinaryName: miyu-app`，README、AGENTS 照改，仓库地址写 `miyu-agent/miyu-app`。
 2. 删了：`src/window.rs`（窗口、窗口大小、等待页的那一套、出错的重试对话框）、`src/navigate.rs`、`src/download.rs`、`src/notify.rs` 和 `src/notify/`、macOS 的应用菜单 `src/menu.rs`、`build.rs`（`tauri-build`）；依赖 `tauri`、`tauri-build`、三个 Tauri 插件、`webkit2gtk`、`glib`、`url`、`serde`。`resources/notification.js` 在 main 上本来就没有（只在 `step/DT-8-通知` 上）。
 3. 留下：`program.rs`（找主程序，调它；要网址读 JSON 的那一套去掉，换成 `miyu web`、`--settings`、`core stop`、`--version`）、`quit.rs`（只留叫核心停，交回给人看的一句）、`log.rs`（轮转、限流照旧；文件改成数据根的 `var/log/miyu-app.log`）、`folder.rs`（只给自己看的目录，加托盘自己的目录在哪）、`text.rs` 和三语的字（键全换成托盘菜单的）、`icons/`、打包流水线、DT-10 的审计修复（`PATH` 只认绝对目录、目录 0700、日志轮转限流、流水线拆权限和钉提交号、PKGBUILD 只填两行）。DT-10 的 D5-1（框里的跳转）、D5-5（调试口子）跟着网页视图一起没了。
 4. 新加：
@@ -39,7 +39,7 @@
 | 重新启动 | 先「停止」，停成了再「启动」 |
 | 打开网页界面 | `miyu web`（最多等 90 秒） |
 | 设置… | `miyu web --settings`；退出码 2（用法不对，旧网页不认）的记一行，再 `miyu web` |
-| 开机时启动 | Windows：`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 值 `Miyu` = `"<miyu-app.exe>" --autostart`；macOS：`~/Library/LaunchAgents/io.github.miyu-agent.app.plist`；Linux：`$XDG_CONFIG_HOME/autostart/miyu-app.desktop`（`Exec=<miyu-app> --autostart`） |
+| 开机时启动 | Windows：`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 值 `Miyu` = `"<miyu-app.exe>" --autostart`；macOS：`~/Library/LaunchAgents/io.github.miyu-agent.miyu-app.plist`；Linux：`$XDG_CONFIG_HOME/autostart/miyu-app.desktop`（`Exec=<miyu-app> --autostart`） |
 | 打开日志所在的文件夹 | `open::that_detached(<数据根>/var/log)`；还没有的弹「还没有日志」 |
 | 关于 Miyu | `rfd` 的消息框：托盘版本、`miyu --version`、资源目录里 `packages/miyu-webui/package.toml` 的 `version`、编进程序的 `pins.toml` |
 | 退出 Miyu | 拿掉托盘图标，`miyu core stop`，没停成照退 |
@@ -81,11 +81,11 @@
 - 关于的消息框：三样版本、提交号；Windows 上 Ctrl+C 能复制。
 - 退出：图标马上没了，核心停了，托盘进程退了。
 - Windows 上调 `miyu` 不闪黑窗口（`CREATE_NO_WINDOW` 照旧）、正式版不开控制台。
-- 打包流水线：`cargo tauri build` 对不是 Tauri 的程序打不打得出来（下面「风险」）。
+- 装好的包：程序叫 `miyu-app`、应用菜单里叫「Miyu」、从应用菜单打开起得来（打包流水线只证明打得出来）。
 
 ### 风险
 
-- 打包工具还是 `cargo tauri build`：它只改 `Cargo.toml` 里 `tauri` 依赖的特性，没有就不改；`mainBinaryName` 让装好的程序叫 `miyu-app`。三个平台的「打包」流水线这一步推上去会跑，结果见「结果」。
+- 打包工具还是 Tauri 的：`cargo tauri build` 编的时候总带 `--features tauri/custom-protocol`，没有 tauri 依赖编不过（第一次推上去三台都红在这里）；流水线改成先 `cargo build --release`，再 `cargo tauri bundle` 只打包。`mainBinaryName` 让装好的程序叫 `miyu-app`。`identifier` 不能以 `.app` 结尾（和 macOS 的程序包撞），定成 `io.github.miyu-agent.miyu-app`，LaunchAgent 的标签同它。
 - `rfd` 在 Linux 上自己起一个 GTK 线程：`tao` 的主循环一直占着默认的主上下文，那个线程拿不到、只是等着，消息框实际在界面线程上画；所以消息框只能在后台线程里弹（界面线程自己弹会等死自己），代码里都是这样调的。
 - 托盘的连接一直连着核心：核心要是以后按「没有头连着」做空闲退出，托盘会让它一直不退，到时候再看。
 - 断了马上再连一次：核心关的时候套接字还在听的那一下，可能报一次「运行中」再报「已停止」，菜单会闪一下。

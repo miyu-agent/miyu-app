@@ -52,7 +52,7 @@
      - 开着时下面多一行「在手机上打开…」：用浏览器打开网页设置里显示局域网地址和二维码的那一组（网页 W-1086 做二维码），手机扫了进登录页、输访问密码。托盘不自己画窗口（2026-11-03 定，AP-2 改进图纸；这一组 AP-3 做）。
    - **这台电脑**：
      - 「开机时启动」：打勾的开关（Windows 照当前用户的 `Run` 注册表项，值名 `Miyu`；macOS 照登录项 `SMAppService`；Linux 照 `~/.config/autostart/miyu-app.desktop`，照 `XDG_CONFIG_HOME`）。开机起来的带 `--autostart`，不开浏览器，只常驻。
-       - macOS 实际用的是用户的 LaunchAgent（`~/Library/LaunchAgents/io.github.miyu-agent.app.plist`，`RunAtLoad`，只在图形登录时起；AP-2）：`SMAppService` 要调 Objective-C 的接口（仓库 `forbid(unsafe_code)`），还要装成签过名的 `.app` 才认。系统设置的「登录项」里一样看得到、关得掉。
+       - macOS 实际用的是用户的 LaunchAgent（`~/Library/LaunchAgents/io.github.miyu-agent.miyu-app.plist`，`RunAtLoad`，只在图形登录时起；AP-2）：`SMAppService` 要调 Objective-C 的接口（仓库 `forbid(unsafe_code)`），还要装成签过名的 `.app` 才认。系统设置的「登录项」里一样看得到、关得掉。
        - 打勾照现在真的开着没有：点了照反过来设，设完再读一遍；设不成的弹一句。Linux 上文件里写了 `Hidden=true`（桌面环境的设置里关掉的）算关着。
      - 「打开日志所在的文件夹」：核心、网页、托盘的日志都在那里（数据根的 `var/log/`），出了问题照它查。还没有的（核心没起过）弹一句「还没有日志」，不替核心建。
    - **关于、退出**：
@@ -95,4 +95,4 @@ core1 2026-11-03 答复：
 - 留下：托盘、单实例、调主程序（`program.rs`）、叫核心停（`quit.rs`）、日志（`log.rs`）、给人看的字、图标、打包流水线、许可证门禁和清单、随包的 PowerShell 7。
 - 去掉：窗口、网页视图、导航和下载交给谁（`navigate.rs`、`download.rs`）、网页视图的通知替身（`notify.rs`、`resources/notification.js`）、macOS 的应用菜单（`menu.rs`）、窗口大小。
 - 分支 `step/DT-8-通知`（DT-7、DT-8、DT-9）不照原样合：许可证（DT-7）、PowerShell 7（DT-9）挪进 AP-5；DT-8 的通知是给网页视图的，不要了，系统通知改成第 5 条。
-- 程序换框架：只要托盘，不要网页视图，Tauri 换成更小的 `tray-icon` + `tao`（Tauri 自己的托盘就是它们），三个平台一份代码。AP-2 做了：`tao` 0.37.2（关了默认功能）、`tray-icon` 0.26.1（Linux 用 AppIndicator 后端）、`rfd` 0.17.2（消息框，Linux 用 GTK 画）、`notify` 8.2.1、`png`、`open`、`tokio`，`winreg`（只 Windows）；核心照 git 依赖钉 `miyu-client`（同 `pins.toml` 的核心）。打包还用 Tauri 的打包工具（`cargo tauri build`，`tauri.conf.json` 只当打包配置），换不换留给 AP-5。
+- 程序换框架：只要托盘，不要网页视图，Tauri 换成更小的 `tray-icon` + `tao`（Tauri 自己的托盘就是它们），三个平台一份代码。AP-2 做了：`tao` 0.37.2（关了默认功能）、`tray-icon` 0.26.1（Linux 用 AppIndicator 后端）、`rfd` 0.17.2（消息框，Linux 用 GTK 画）、`notify` 8.2.1、`png`、`open`、`tokio`，`winreg`（只 Windows）；核心照 git 依赖钉 `miyu-client`（同 `pins.toml` 的核心）。打包还用 Tauri 的打包工具：先 `cargo build --release`，再 `cargo tauri bundle`（`cargo tauri build` 总带 `tauri/custom-protocol` 特性，没有 tauri 依赖编不过），`tauri.conf.json` 只当打包配置；换不换留给 AP-5。

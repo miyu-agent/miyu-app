@@ -1,7 +1,7 @@
 //! 「开机时启动」（图纸 `app.md` 第 4 条「这台电脑」）：登录时把托盘带一个参数拉起来，只常驻、不开浏览器。
 //!
 //! - Windows：当前用户的 `Run` 注册表项，值名 `Miyu`。
-//! - macOS：用户的 LaunchAgent（`~/Library/LaunchAgents/io.github.miyu-agent.app.plist`）。图纸写的是登录项 `SMAppService`：
+//! - macOS：用户的 LaunchAgent（`~/Library/LaunchAgents/io.github.miyu-agent.miyu-app.plist`）。图纸写的是登录项 `SMAppService`：
 //!   它要调 Objective-C 的接口（仓库 `forbid(unsafe_code)`），还要装成签过名的 `.app` 才认，第一版先用 LaunchAgent，系统设置的
 //!   「登录项」里一样看得到、关得掉（「允许在后台」那一栏）。
 //! - Linux：`~/.config/autostart/miyu-app.desktop`（XDG 自动启动）。
@@ -18,7 +18,7 @@ pub const ARG: &str = "--autostart";
 #[cfg_attr(not(windows), allow(dead_code, reason = "只有 Windows 用"))]
 const NAME: &str = "Miyu";
 #[cfg_attr(not(target_os = "macos"), allow(dead_code, reason = "只有 macOS 用"))]
-const LABEL: &str = "io.github.miyu-agent.app";
+const LABEL: &str = "io.github.miyu-agent.miyu-app";
 
 /// 开着没有。
 pub fn enabled() -> bool {

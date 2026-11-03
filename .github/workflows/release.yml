@@ -97,8 +97,12 @@ jobs:
           cat dist/pins.txt
       - name: 装 Tauri 的打包工具
         run: cargo install tauri-cli --version =2.12.4 --locked
+      # 程序不再是 Tauri 的（施工 AP-2）：`cargo tauri build` 编的时候总要带 `tauri/custom-protocol` 这个特性，没有 tauri 依赖就编不过。
+      # 自己编 release，再只用它的打包（`tauri bundle` 照 mainBinaryName 找编好的 target/release/miyu-app）。
+      - name: 编托盘程序
+        run: cargo build --release --locked
       - name: 打包
-        run: cargo tauri build --ci --config ${{ matrix.config }}
+        run: cargo tauri bundle --ci --config ${{ matrix.config }}
       - name: 收安装包
         shell: bash
         run: |

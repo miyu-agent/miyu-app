@@ -3,7 +3,7 @@
   "productName": "Miyu",
   "mainBinaryName": "miyu-app",
   "version": "0.1.0",
-  "identifier": "io.github.miyu-agent.app",
+  "identifier": "io.github.miyu-agent.miyu-app",
   "build": {},
   "app": {
     "windows": [],

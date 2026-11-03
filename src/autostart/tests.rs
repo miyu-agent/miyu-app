@@ -45,7 +45,7 @@ fn the_launch_agent_file_is_in_the_home() {
     assert_eq!(
         launch_agent_file(Some("/Users/u".into())),
         Some(PathBuf::from(
-            "/Users/u/Library/LaunchAgents/io.github.miyu-agent.app.plist"
+            "/Users/u/Library/LaunchAgents/io.github.miyu-agent.miyu-app.plist"
         ))
     );
     assert_eq!(launch_agent_file(None), None);
@@ -56,7 +56,7 @@ fn the_launch_agent_runs_at_login_with_the_argument() {
     let plist = launch_agent(Path::new(
         "/Applications/Miyu & Co.app/Contents/MacOS/miyu-app",
     ));
-    assert!(plist.contains("<string>io.github.miyu-agent.app</string>"));
+    assert!(plist.contains("<string>io.github.miyu-agent.miyu-app</string>"));
     assert!(plist.contains(
         "<string>/Applications/Miyu &amp; Co.app/Contents/MacOS/miyu-app</string>\n    <string>--autostart</string>"
     ));
