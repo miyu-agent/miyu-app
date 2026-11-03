@@ -144,6 +144,7 @@ fn write(path: &Path, text: &str) -> io::Result<()> {
     std::fs::write(path, text)
 }
 
+#[cfg_attr(windows, allow(dead_code, reason = "Windows 不用"))]
 fn no_home() -> io::Error {
     io::Error::new(io::ErrorKind::NotFound, "no home folder")
 }
