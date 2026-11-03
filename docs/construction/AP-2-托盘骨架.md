@@ -92,4 +92,8 @@
 
 ### 结果
 
-（推上去以后补：提交号、CI 运行号、三个平台各自的结论。）
+- 提交：`dd66d96` 改名、`58af077` 换钉、`69cbf3b` 图纸和施工单、`3605bc2` 托盘、`662cc21` Windows 上 clippy 报没用到、`1e05afa` 打包改成先编再 `tauri bundle`，以及补这一节的那一个。`dd66d96` 误带进了删窗口那几个文件和旧的 `Cargo.lock`（暂存区里先删了，那一次 `git add` 因为 `build.rs` 已删而失败，提交照样带走了暂存的删除）；已经推了，照规矩不改，`3605bc2` 的正文写明了。`69cbf3b` 那一个提交编不过（删了旧代码、新代码还没进），它的 CI 取消了。
+- CI（`ci.yml`）：运行 41604148798（`3605bc2`）Linux、macOS 绿，Windows 红在 clippy（`no_home` 没用到）；运行 41605555955（`662cc21`）三台都绿；运行 41607363169（`1e05afa`）三台都绿。
+- 打包（`release.yml`）：运行 41604148711（`3605bc2`）Linux、macOS 红在 `cargo tauri build`（`tauri/custom-protocol` 特性），Windows 跑到一半取消；运行 41607363127（`1e05afa`）三台都绿，出了 deb、rpm、PKGBUILD、dmg、MSI。
+- 拆开 Linux 的 deb 看：`usr/bin/miyu-app`、`miyu`、`miyu-sandbox`、`miyu-extract`，`usr/share/applications/miyu-app.desktop`，图标 `miyu-app.png`，网页包在 `usr/share/miyu/packages/miyu-webui/`。依赖里还有 `libwebkit2gtk-4.1-0`：Tauri 的打包工具在 Linux 上不管配置写什么，总给 deb 加 `libwebkit2gtk-4.1-0`、`libgtk-3-0`，给 rpm 加 `libwebkit2gtk-4.1.so.0`（`tauri-cli` 2.12.4 `interface/rust.rs`），关不掉。AUR 的 PKGBUILD 自己写依赖，不受影响。要去掉得换打包工具或者打完改 control，留给 AP-5。
+- Windows 安装包不再带 WebView2 的引导（`windows.json` 加 `webviewInstallMode: skip`），补这一节的那个提交一起推，等那一次的「打包」。
