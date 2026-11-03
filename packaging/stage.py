@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# 搭安装包的内容（施工 DT-6，蓝图 desktop.md「装在哪」）：核心、网页软件编好以后，照 Tauri 打包要的样子放进 dist/。
-#   dist/binaries/<程序>-<目标三元组>[.exe]  Tauri 的 externalBin：装在外壳旁边，名字去掉三元组
+# 搭安装包的内容（施工 DT-6，图纸 app.md「装在哪」）：核心、网页软件编好以后，照 Tauri 打包工具要的样子放进 dist/。
+#   dist/binaries/<程序>-<目标三元组>[.exe]  Tauri 的 externalBin：装在托盘程序旁边，名字去掉三元组
 #   dist/resources/                         核心仓库的整份 resources/，加网页包的文件夹 packages/miyu-webui/
 #   dist/pins.txt                           钉的两个提交号，写进发版说明
 # 网页包的文件夹照网页仓库 tools/pack-web.py 装好的样子（网页的会话 2026-10-30 定）：清单补 version、不写 targets，
@@ -40,7 +40,7 @@ def copy_program(built, name, exe, dest):
 
 
 def main():
-    ap = argparse.ArgumentParser(description='搭桌面端安装包的内容')
+    ap = argparse.ArgumentParser(description='搭 Miyu 安装包的内容')
     ap.add_argument('--core', required=True, type=pathlib.Path, help='核心的检出，已经编过 release')
     ap.add_argument('--web', required=True, type=pathlib.Path, help='网页的检出，已经编过 release')
     ap.add_argument('--triple', required=True, help='目标三元组，比如 x86_64-unknown-linux-gnu')

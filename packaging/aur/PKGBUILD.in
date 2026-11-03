@@ -1,17 +1,18 @@
-# Miyu 桌面端的 AUR 包（施工 DT-6）：直接拆发版里的 deb。发版的流水线填 pkgver、sha256sums 两行，传进发版；推到 AUR 由项目主人做。
+# Miyu（托盘程序 miyu-app）的 AUR 包（施工 DT-6；AP-2 从 miyu-desktop-bin 改名）：直接拆发版里的 deb。发版的流水线填 pkgver、sha256sums 两行，传进发版；推到 AUR 由项目主人做。
 # 带了核心（/usr/bin/miyu），和单独装的 miyu 包冲突。
-pkgname=miyu-desktop-bin
+pkgname=miyu-app-bin
 pkgver=@VERSION@
 pkgrel=1
-pkgdesc="Miyu desktop: the Miyu web interface in a window with a tray icon, including the Miyu core"
+pkgdesc="Miyu: a tray icon that runs Miyu and opens its web interface in your browser, including the Miyu core"
 arch=('x86_64')
-url="https://github.com/miyu-agent/miyu-desktop"
+url="https://github.com/miyu-agent/miyu-app"
 license=('AGPL-3.0-or-later')
-depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'bubblewrap')
-provides=('miyu-desktop' 'miyu')
-conflicts=('miyu-desktop' 'miyu')
+depends=('gtk3' 'libayatana-appindicator' 'bubblewrap')
+provides=('miyu-app' 'miyu')
+conflicts=('miyu-app' 'miyu' 'miyu-desktop' 'miyu-desktop-bin')
+replaces=('miyu-desktop-bin')
 options=('!strip' '!debug')
-source=("https://github.com/miyu-agent/miyu-desktop/releases/download/v${pkgver}/miyu-desktop_${pkgver}_amd64.deb")
+source=("https://github.com/miyu-agent/miyu-app/releases/download/v${pkgver}/miyu-app_${pkgver}_amd64.deb")
 sha256sums=('@SHA256@')
 
 package() {
