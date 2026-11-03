@@ -27,7 +27,7 @@
    - `src/about.rs`：关于里的三样版本和钉的提交号。
    - `src/icon.rs`：PNG 解成 RGBA、状态行的小圆点现画。
    - `icons/source/lucide/` 四个 Lucide 原稿（`square`、`play`、`rotate-cw`、`power`，ISC，许可证一起放进去），`icons/source/build.sh menu` 出 `icons/menu/*.png`（灰 `#808080`、32px）。
-5. 依赖（crates.io 上 2026-11-03 的稳定版，`Cargo.lock` 里）：`tao` =0.37.2（关默认功能）、`tray-icon` =0.26.1（默认 AppIndicator 后端）、`rfd` =0.17.2（只开 `gtk3`）、`notify` 8.2.1（CC0-1.0）、`png` 0.18.1、`open` 5.4.5、`serde_json` 1.0.154、`sys-locale` 0.3.2、`tokio` 1.54.1、`toml` 1.1.8、`winreg` 0.56.0（只 Windows）；`miyu-client` 照 git 钉核心 main `7783ce2c082b4993bfb39cc83bb5ca5bc1aa22d8`，`pins.toml` 的核心一起换成它。CI、打包流水线在 Linux 上装 `libgtk-3-dev libayatana-appindicator3-dev`，不再装 WebKitGTK、librsvg、libxdo、libssl；deb、rpm、AUR 的依赖照改（`libgtk-3-0`/`gtk3` 加 AppIndicator）。
+5. 依赖（crates.io 上 2026-11-03 的稳定版，`Cargo.lock` 里）：`tao` =0.37.2（关默认功能）、`tray-icon` =0.26.1（默认 AppIndicator 后端）、`rfd` =0.17.2（只开 `gtk3`）、`notify` 8.2.1（CC0-1.0）、`png` 0.18.1、`open` 5.4.5、`serde_json` 1.0.154、`sys-locale` 0.3.2、`tokio` 1.54.1、`toml` 1.1.8、`winreg` 0.56.0（只 Windows）；`miyu-client` 照 git 钉核心 main，`pins.toml` 的核心一起换成同一个：先钉 `7783ce2c082b4993bfb39cc83bb5ca5bc1aa22d8`，核心 TR-1、TR-2 合进 main 以后换成 `d58f7b0990d92784c04142e114b886c8b1511ce5`（在它后面，2026-11-03 经协调的会话转来；托盘这一步还不用 TR-1、TR-2，换了以后 AP-3、AP-4 不用再换钉）。CI、打包流水线在 Linux 上装 `libgtk-3-dev libayatana-appindicator3-dev`，不再装 WebKitGTK、librsvg、libxdo、libssl；deb、rpm、AUR 的依赖照改（`libgtk-3-0`/`gtk3` 加 AppIndicator）。
 
 ### 菜单每一项实际调什么
 
@@ -96,4 +96,5 @@
 - CI（`ci.yml`）：运行 41604148798（`3605bc2`）Linux、macOS 绿，Windows 红在 clippy（`no_home` 没用到）；运行 41605555955（`662cc21`）三台都绿；运行 41607363169（`1e05afa`）三台都绿。
 - 打包（`release.yml`）：运行 41604148711（`3605bc2`）Linux、macOS 红在 `cargo tauri build`（`tauri/custom-protocol` 特性），Windows 跑到一半取消；运行 41607363127（`1e05afa`）三台都绿，出了 deb、rpm、PKGBUILD、dmg、MSI。
 - 拆开 Linux 的 deb 看：`usr/bin/miyu-app`、`miyu`、`miyu-sandbox`、`miyu-extract`，`usr/share/applications/miyu-app.desktop`，图标 `miyu-app.png`，网页包在 `usr/share/miyu/packages/miyu-webui/`。依赖里还有 `libwebkit2gtk-4.1-0`：Tauri 的打包工具在 Linux 上不管配置写什么，总给 deb 加 `libwebkit2gtk-4.1-0`、`libgtk-3-0`，给 rpm 加 `libwebkit2gtk-4.1.so.0`（`tauri-cli` 2.12.4 `interface/rust.rs`），关不掉。AUR 的 PKGBUILD 自己写依赖，不受影响。要去掉得换打包工具或者打完改 control，留给 AP-5。
-- Windows 安装包不再带 WebView2 的引导（`windows.json` 加 `webviewInstallMode: skip`），补这一节的那个提交一起推，等那一次的「打包」。
+- Windows 安装包不再带 WebView2 的引导（`windows.json` 加 `webviewInstallMode: skip`，`e286f30`）：CI 运行 41610616635 三台都绿。
+- 换钉核心 `d58f7b099`（最后一个提交）：见下一次推上去的 CI、打包。

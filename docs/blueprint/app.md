@@ -86,13 +86,13 @@ core1 2026-11-03 答复：
 - 连核心不拉起：已经有了，`miyu-client` 的 `Core::connect_running(root, kind)`（`miyu core stop` 用的那个），托盘只用它，不用会拉起核心的连法。终端、网页服务、`miyu web` 照旧会拉起核心：托盘停着的时候别的头一连，核心就又起来了，这是对的（人在用），托盘照第 4 条的状态行跟着写「运行中」。托盘不在跑的时候怎么知道核心又起来了：看核心的锁文件（`run/core.lock`，系统的文件变动通知，不定时去问），一变就再 `connect_running` 一次。
   - AP-2 实际做法：盯整个 `run/`（不递归），里面有新建、改了、删了的就再连一次。光盯 `run/core.lock` 不够：锁文件本来就有的，核心起来时只是打开、拿锁，不改它，macOS、Windows 上不报；核心起来一定会换 `run/token`、写 `run/socket`。只是打开、读的不算（inotify 会报，托盘自己连核心时读令牌也会报）。`run/` 没有的盯数据根，数据根也没有的盯它的上一级。
   - 连法同 `Core::connect_running`（`miyu-client` 的 `connect::connect`，加同一句 `hello`，`head.kind` 报 `miyu-app`），只是读的那一半托盘自己拿着、读到头就是断了：`Core` 只能一问一答（`call` 30 秒没回就当没回应），等不了「断了」。网页软件跟着配置的那条连接（网页 `follow.rs`）也是这样写的。以后核心门面给一个「等它断」的口子，换成它。断了马上再连一次：核心崩了、被叫停的连不上，报「已停止」；只是这条连接断了的接着连上。
-- 「谁来发后台通知」的登记（第 5 条）：核心 TR-1。连接说一声「我来发」，断开就作废；别的头不用轮询也知道这时有没有人在发。形状（核心分支 `step/TR-tray-core`，还没合进 main，2026-11-03 经协调的会话转来）：托盘连上核心以后调 `notices.claim`（参数空，回 `{}`），之后订会话状态和 `notices` 流来发（AP-4）。AP-2 在 `src/link.rs` 握手之后留了位置。
+- 「谁来发后台通知」的登记（第 5 条）：核心 TR-1。连接说一声「我来发」，断开就作废；别的头不用轮询也知道这时有没有人在发。形状（2026-11-03 合进核心 main `d58f7b099`，托盘这一步起钉的就是它）：托盘连上核心以后调 `notices.claim`（参数空，回 `{}`），之后订会话状态和 `notices` 流来发（AP-4）。AP-2 在 `src/link.rs` 握手之后留了位置。
 - `miyu web` 打开时直接到某个会话、设置页：核心不用动，`miyu web` 后面的参数原样转给网页包的 `open`，参数由网页定（网页 W-1085：`--session <编号>`、`--settings`）。
-- 软件包清单里的托盘入口（第 4 条「软件包挂的入口」）：核心 TR-2。清单新加一张表，名字分语言，只能指向本包自己的后台页，指别处报错；`package.list` 照装着的带出来。写法（同上，核心分支 `step/TR-tray-core`，还没合）：清单写 `[tray] name = {zh, en}`；`package.list` 和 packages 流里，有后台页又写了 `[tray]` 的包多一格 `"tray": {"name": "<照连接的语言挑好的>"}`；托盘照 `enabled`、`status` 只列开着的，点了跑 `miyu web --package <编号>`（AP-3）。AP-2 在 `src/tray.rs` 建菜单的地方留了位置。
+- 软件包清单里的托盘入口（第 4 条「软件包挂的入口」）：核心 TR-2。清单新加一张表，名字分语言，只能指向本包自己的后台页，指别处报错；`package.list` 照装着的带出来。写法（同上，核心 main `d58f7b099`）：清单写 `[tray] name = {zh, en}`；`package.list` 和 packages 流里，有后台页又写了 `[tray]` 的包多一格 `"tray": {"name": "<照连接的语言挑好的>"}`；托盘照 `enabled`、`status` 只列开着的，点了跑 `miyu web --package <编号>`（AP-3）。AP-2 在 `src/tray.rs` 建菜单的地方留了位置。
 
 ### 原来外壳的去留
 
 - 留下：托盘、单实例、调主程序（`program.rs`）、叫核心停（`quit.rs`）、日志（`log.rs`）、给人看的字、图标、打包流水线、许可证门禁和清单、随包的 PowerShell 7。
 - 去掉：窗口、网页视图、导航和下载交给谁（`navigate.rs`、`download.rs`）、网页视图的通知替身（`notify.rs`、`resources/notification.js`）、macOS 的应用菜单（`menu.rs`）、窗口大小。
 - 分支 `step/DT-8-通知`（DT-7、DT-8、DT-9）不照原样合：许可证（DT-7）、PowerShell 7（DT-9）挪进 AP-5；DT-8 的通知是给网页视图的，不要了，系统通知改成第 5 条。
-- 程序换框架：只要托盘，不要网页视图，Tauri 换成更小的 `tray-icon` + `tao`（Tauri 自己的托盘就是它们），三个平台一份代码。AP-2 做了：`tao` 0.37.2（关了默认功能）、`tray-icon` 0.26.1（Linux 用 AppIndicator 后端）、`rfd` 0.17.2（消息框，Linux 用 GTK 画）、`notify` 8.2.1、`png`、`open`、`tokio`，`winreg`（只 Windows）；核心照 git 依赖钉 `miyu-client`（同 `pins.toml` 的核心）。打包还用 Tauri 的打包工具：先 `cargo build --release`，再 `cargo tauri bundle`（`cargo tauri build` 总带 `tauri/custom-protocol` 特性，没有 tauri 依赖编不过），`tauri.conf.json` 只当打包配置；换不换留给 AP-5。
+- 程序换框架：只要托盘，不要网页视图，Tauri 换成更小的 `tray-icon` + `tao`（Tauri 自己的托盘就是它们），三个平台一份代码。AP-2 做了：`tao` 0.37.2（关了默认功能）、`tray-icon` 0.26.1（Linux 用 AppIndicator 后端）、`rfd` 0.17.2（消息框，Linux 用 GTK 画）、`notify` 8.2.1、`png`、`open`、`tokio`，`winreg`（只 Windows）；核心照 git 依赖钉 `miyu-client`（核心 main `d58f7b099`，同 `pins.toml` 的核心）。打包还用 Tauri 的打包工具：先 `cargo build --release`，再 `cargo tauri bundle`（`cargo tauri build` 总带 `tauri/custom-protocol` 特性，没有 tauri 依赖编不过），`tauri.conf.json` 只当打包配置；换不换留给 AP-5。

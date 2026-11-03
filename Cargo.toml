@@ -27,7 +27,7 @@ tokio = { version = "1.54.1", features = ["io-util", "rt", "sync", "time"] }
 toml = "1.1.8"
 # 核心照 git 依赖钉住一个提交（同网页仓库的做法、同 pins.toml 的核心）：升级就是改这里的 rev 和 pins.toml、过三台 CI。
 # 只经门面用：找数据根、资源目录，连核心，拉起核心。
-miyu-client = { git = "https://github.com/miyu-agent/miyu", rev = "7783ce2c082b4993bfb39cc83bb5ca5bc1aa22d8" }
+miyu-client = { git = "https://github.com/miyu-agent/miyu", rev = "d58f7b0990d92784c04142e114b886c8b1511ce5" }
 
 # 「开机时启动」写当前用户的 Run 注册表项。
 [target.'cfg(windows)'.dependencies]
