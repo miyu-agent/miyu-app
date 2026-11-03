@@ -5,12 +5,12 @@
 //! |---|---|
 //! | 打开网页界面 | `miyu web` |
 //! | 设置… | `miyu web --settings`；旧网页不认这个参数（退出码 2）的，退回 `miyu web` |
-//! | 停止 | `miyu core stop` |
+//! | 停止 | `miyu web --stop`（网页 W-1091），再 `miyu core stop` |
 //! | 启动 | 照头的办法拉起核心：建好数据根的骨架，`connect_or_start` 拉起 `miyu core`（不开浏览器） |
-//! | 重新启动 | 先停再起 |
+//! | 重新启动 | 先停核心再起（网页软件留着，页面接着连新的） |
 //! | 打开日志所在的文件夹 | 用系统的文件管理器打开数据根的 `var/log/` |
 //! | 关于 Miyu | 系统的消息框，见 `about` |
-//! | 退出 Miyu | `miyu core stop`，再退 |
+//! | 退出 Miyu | 同「停止」，再退 |
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -81,7 +81,7 @@ pub fn open_web(ctx: &Ctx, settings: bool) {
 pub fn stop(ctx: &Ctx) {
     let ctx = ctx.clone();
     background("stop", move || {
-        let ok = stop_now(&ctx);
+        let ok = stop_now(&ctx, true);
         ctx.post.send(Event::Done(Busy::Stopping, ok));
         ctx.wake();
     });
@@ -101,7 +101,7 @@ pub fn start(ctx: &Ctx) {
 pub fn restart(ctx: &Ctx) {
     let ctx = ctx.clone();
     background("restart", move || {
-        let stopped = stop_now(&ctx);
+        let stopped = stop_now(&ctx, false);
         if stopped {
             ctx.post.send(Event::Begin(Busy::Starting));
         }
@@ -114,12 +114,13 @@ pub fn restart(ctx: &Ctx) {
     });
 }
 
-/// 「退出 Miyu」：叫核心停，停没停成都退。
+/// 「退出 Miyu」：叫网页软件、核心停，停没停成都退。
 pub fn quit(ctx: &Ctx) {
     let ctx = ctx.clone();
     background("quit", move || {
         match ctx.miyu.as_deref() {
             Some(miyu) => {
+                quit::stop_web(miyu);
                 if let Err(why) = quit::stop_core(miyu, &ctx.text) {
                     log::line(&format!("quitting although the core did not stop: {why}"));
                 }
@@ -178,11 +179,15 @@ pub fn toggle_autostart(ctx: &Ctx) -> bool {
     crate::autostart::enabled()
 }
 
-fn stop_now(ctx: &Ctx) -> bool {
+/// 叫核心停，`web` 的先叫网页软件停；没停成的弹一句。
+fn stop_now(ctx: &Ctx, web: bool) -> bool {
     let Some(miyu) = ctx.miyu.as_deref() else {
         tell(&ctx.text, key::NO_PROGRAM, "");
         return false;
     };
+    if web {
+        quit::stop_web(miyu);
+    }
     match quit::stop_core(miyu, &ctx.text) {
         Ok(()) => true,
         Err(why) => {
