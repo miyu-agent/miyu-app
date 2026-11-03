@@ -1,6 +1,6 @@
 ## AP-2：托盘骨架
 
-状态：已完成（2026-11-03，Linux 本机单测、门禁、真核心的两个手动测试过；三平台 CI 见「结果」）。托盘的界面三个平台都没人手测过，见「要人手测的」。
+状态：已完成（2026-11-03，Linux 本机单测、门禁、真核心的两个手动测试过；三平台 CI、打包都绿，见「结果」）。托盘的界面三个平台都没人手测过，见「要人手测的」。
 
 ### 目的
 
@@ -97,4 +97,5 @@
 - 打包（`release.yml`）：运行 41604148711（`3605bc2`）Linux、macOS 红在 `cargo tauri build`（`tauri/custom-protocol` 特性），Windows 跑到一半取消；运行 41607363127（`1e05afa`）三台都绿，出了 deb、rpm、PKGBUILD、dmg、MSI。
 - 拆开 Linux 的 deb 看：`usr/bin/miyu-app`、`miyu`、`miyu-sandbox`、`miyu-extract`，`usr/share/applications/miyu-app.desktop`，图标 `miyu-app.png`，网页包在 `usr/share/miyu/packages/miyu-webui/`。依赖里还有 `libwebkit2gtk-4.1-0`：Tauri 的打包工具在 Linux 上不管配置写什么，总给 deb 加 `libwebkit2gtk-4.1-0`、`libgtk-3-0`，给 rpm 加 `libwebkit2gtk-4.1.so.0`（`tauri-cli` 2.12.4 `interface/rust.rs`），关不掉。AUR 的 PKGBUILD 自己写依赖，不受影响。要去掉得换打包工具或者打完改 control，留给 AP-5。
 - Windows 安装包不再带 WebView2 的引导（`windows.json` 加 `webviewInstallMode: skip`，`e286f30`）：CI 运行 41610616635 三台都绿。
-- 换钉核心 `d58f7b099`（最后一个提交）：见下一次推上去的 CI、打包。
+- `e286f30` 的打包运行 41610616643 三台都绿（Windows 的 MSI 去掉 WebView2 引导以后照样出得来）。
+- 换钉核心 `d58f7b099`（`5c92655`）：CI 运行 41614850373 三台都绿，打包运行 41614850363 三台都绿。
