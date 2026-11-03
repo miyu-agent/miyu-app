@@ -1,9 +1,10 @@
 # 安装包里的核心、网页软件用哪一版（施工 DT-6）。升级：改 rev、推 step/ 分支跑三台的「打包」、出包手测，再打发版的 tag。
-# 写完整的提交号。核心要 CL-7 以后的（miyu web 转交给网页包里的程序）；网页照它的 main，不照核心 heads.toml 里钉的那一版。
+# 写完整的提交号。核心要 CL-7 以后的（miyu web 转交给网页包里的程序），和 Cargo.toml 里托盘连核心用的 miyu-client 钉同一个
+# 提交（施工 AP-2）；网页照它的 main，不照核心 heads.toml 里钉的那一版。
 
 [core]
 repo = "miyu-agent/miyu"
-rev = "aa4f692a936076ce2daaede2929927e2e5490b3a"
+rev = "7783ce2c082b4993bfb39cc83bb5ca5bc1aa22d8"
 
 [web]
 repo = "miyu-agent/miyu-web"
