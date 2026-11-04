@@ -1,6 +1,6 @@
 ## AP-5：安装包收尾
 
-状态：在做（2026-11-04）。本机单测、门禁、拆包脚本在上一次打包的 deb、rpm 上试过；三平台 CI、打包见「结果」。
+状态：已完成（2026-11-05，本机单测、门禁、拆包脚本；三平台打包和流水线里拆开核对都过了，见「结果」）。Windows 的图标、macOS 的程序坞、Linux 上装包没人手测过，见「要人手测的」。
 
 ### 目的
 
@@ -94,4 +94,12 @@
 
 ### 结果
 
-（等 CI、打包跑完补。）
+- 提交：`a996cf4` 许可证门禁和清单、三份许可证进安装包，`5c7d060` PowerShell 7，`2e57b95` exe 的图标和名字，`7c6ff5c` LSUIElement，`cb5724b` deb/rpm 去掉 WebKitGTK，`0ef7eae` 拆开核对，`6724e92` 合进 main（`7f717f3`，AP-4 补）、重新生成清单，`c5b12cd` 拆开核对 deb 的路径，以及补这一节的那一个。`a996cf4` 的正文说清单「179 段」是按 `=====` 开头的行数的，实际 171 段，已经推了，照规矩不改，`6724e92` 的正文写明了。
+- CI（`ci.yml`）：运行 41849987606（`0ef7eae`）、41855823674（`c5b12cd`）Linux、Windows 都绿（许可证一步过）；macOS 那台三次都没排上（GitHub「macOS arm64 runners 容量不够」，没分到机器被取消），见下一条。
+- 打包（`release.yml`）：
+  - 运行 41849987407（`0ef7eae`）：macOS、Windows 绿，Linux 红在「拆开核对」——deb 里的路径 Tauri 写成 `usr/…`（不带 `./`），核对那一句只认 `./` 开头的，许可证明明在也找不到；同一次的 rpm 已经过了（`Requires` 没有 webkit、`rpm -K` 「digests OK」）。`c5b12cd` 改了。
+  - 运行 41855823562（`c5b12cd`）：Linux、Windows 绿；macOS 三次都没排上机器（同上）。macOS 上要核对的（`Info.plist`、`licenses/`）和 `0ef7eae` 一样，合进来的 AP-4 补只改了 Windows 的通知。
+- 拆开核对的输出：
+  - Linux（41855823562）：`drop-webkit.py`「去掉 libwebkit2gtk-4.1-0；Depends: libgtk-3-0, bubblewrap」「去掉 libwebkit2gtk-4.1.so.0()(64bit)」；`rpm -qpR` 剩 `bubblewrap`、`gtk3`、`libgtk-3.so.0()(64bit)` 和三个 `rpmlib(...)`；`rpm -K --nosignature`「digests OK」；deb、rpm 的 `/usr/share/miyu/licenses/` 三份、网页包根上两份都在。下了附件在本机再看：deb 的 `Depends: libgtk-3-0, bubblewrap`，`/usr/share/miyu/licenses/` 下 12 项（托盘的清单 529,980 字节、核心的 668,272、网页的 576,752），PKGBUILD 的 `sha256sums` 是改过以后的 deb 的。
+  - Windows（41849987407、41855823562）：PowerShell 7.6.9 win-x64 校验值对上、解进 `dist\resources\pwsh`；三种语言的 MSI（各约 129 MB，原来约 25 MB）都是「PowerShell 7.6.9，许可证都在，miyu-app.exe 是 Miyu 0.1.0」。
+  - macOS（41849987407）：`Miyu.app` 和 dmg（约 22 MB）挂上以后里面的 `Miyu.app`：`Info.plist: OK`，`LSUIElement = true`，三份许可证都在。
