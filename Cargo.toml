@@ -16,6 +16,9 @@ tao = { version = "=0.37.2", default-features = false }
 tray-icon = { version = "=0.26.1", default-features = false, features = ["ksni"] }
 # 系统原生的消息框（关于、出错）。Linux 上用 GTK 画（tao 本来就要 GTK），不用默认的 xdg 门户那一套。
 rfd = { version = "=0.17.2", default-features = false, features = ["gtk3"] }
+# 系统通知（施工 AP-4）：Linux 走会话 D-Bus 的 org.freedesktop.Notifications（zbus，同 ksni 那一套），macOS 走 NSUserNotificationCenter，
+# Windows 走 WinRT 的 toast。钉死版本：点了通知回不回得来跟着它变，升级要三个平台再手测。
+notify-rust = "=4.18.2"
 # 盯数据根的 `run/`（别人把核心拉起来了）、单实例「请打开」的文件。
 notify = "8.2.1"
 # 编进程序的 PNG 解成托盘库要的 RGBA。
