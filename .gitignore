@@ -2,3 +2,6 @@
 /gen/
 /dist/
 /.worktrees/
+
+# Python 跑过留下的字节码（packaging/ 里的脚本）
+__pycache__/
