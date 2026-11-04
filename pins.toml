@@ -8,4 +8,4 @@ rev = "61f1f3ef27852a8a2ae3a37cb3bb29be8da9b4dc"
 
 [web]
 repo = "miyu-agent/miyu-web"
-rev = "a2e3caf31c49f865758dae909e596fdb9454f774"
+rev = "85fcd43cf864cb9e5d08052743055b9ee72dda86"
