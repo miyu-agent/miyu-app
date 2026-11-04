@@ -110,6 +110,11 @@ jobs:
           find target/release/bundle \( -name '*.deb' -o -name '*.rpm' -o -name '*.dmg' -o -name '*.msi' \) -exec cp {} out/ \;
           ls -la out
           test -n "$(ls out)"
+      # 施工 AP-5：Tauri 的打包工具总给 deb、rpm 加 WebKitGTK 的依赖（关不掉），托盘不用网页视图，打完去掉；只改依赖，文件一个字节不动。
+      # 要在填 AUR 之前：PKGBUILD 的校验值照改完的 deb 算。
+      - name: deb、rpm 去掉 WebKitGTK 的依赖
+        if: runner.os == 'Linux'
+        run: python3 packaging/drop-webkit.py out/*.deb out/*.rpm
       - name: 填 AUR 的 PKGBUILD
         if: runner.os == 'Linux'
         shell: bash
