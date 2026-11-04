@@ -4,7 +4,8 @@
 //! 2. 「停止」或「启动」、「重新启动」（带图标；不能用时灰着，不藏）；
 //! 3. 「打开网页界面」（默认项）、「设置…」（macOS 带 ⌘,）；
 //! 4. 软件包挂的入口（核心 TR-2，施工 AP-3）：一个包一行，一个都没有的不出这一组；
-//! 5. （局域网：AP-3，同上）
+//! 5. 局域网（施工 AP-3）：「局域网访问」（打勾；只在运行中能点），开着时多一行「在手机上打开…」；核心说不认 `web.listen` 的、
+//!    还没连上过的不出这一组；
 //! 6. 「开机时启动」（打勾）、「打开日志所在的文件夹」；
 //! 7. 「关于 Miyu」、「退出 Miyu」（带图标；macOS 带 ⌘Q）。
 //!
@@ -28,6 +29,8 @@ pub mod id {
     pub const RESTART: &str = "restart";
     pub const OPEN: &str = "open";
     pub const SETTINGS: &str = "settings";
+    pub const LAN: &str = "lan";
+    pub const PHONE: &str = "phone";
     pub const AUTOSTART: &str = "autostart";
     pub const LOGS: &str = "logs";
     pub const ABOUT: &str = "about";
@@ -50,6 +53,8 @@ struct Items {
     toggle: IconMenuItem,
     restart: IconMenuItem,
     autostart: CheckMenuItem,
+    /// 「局域网访问」：这一组不出的时候没有。
+    lan: Option<CheckMenuItem>,
 }
 
 /// 照核心来的、变了要把菜单整个换掉的几行。
@@ -57,6 +62,8 @@ struct Items {
 pub struct Extras {
     /// 软件包挂的入口。
     pub packages: Vec<Entry>,
+    /// 局域网开没开（`web.listen`）；`None` 是还不知道、核心不认（网页软件没装）：不出这一组。
+    pub lan: Option<bool>,
 }
 
 /// 解一张编进程序的菜单图标；解不出的（不会：测试查过）不带图标。
@@ -137,7 +144,18 @@ fn menu(text: &Text, autostart: bool, extras: &Extras) -> Result<(Menu, Items), 
         added.push(menu.append(&separator()));
         added.extend(packages.iter().map(|item| menu.append(item)));
     }
-    // 局域网（AP-3）：「局域网访问」打勾的开关，开着时多一行「在手机上打开…」，前面一根分隔线。
+    // 局域网：「局域网访问」打勾的开关，开着时多一行「在手机上打开…」（用浏览器打开网页设置「访问」那一组，地址和二维码在那里）。
+    let lan = extras
+        .lan
+        .map(|on| CheckMenuItem::with_id(id::LAN, text.get(key::LAN), false, on, None));
+    let phone = MenuItem::with_id(id::PHONE, text.get(key::PHONE), true, None);
+    if let Some(lan) = &lan {
+        added.push(menu.append(&separator()));
+        added.push(menu.append(lan));
+        if extras.lan == Some(true) {
+            added.push(menu.append(&phone));
+        }
+    }
     added.extend([
         menu.append(&separator()),
         menu.append(&autostart_item),
@@ -154,6 +172,7 @@ fn menu(text: &Text, autostart: bool, extras: &Extras) -> Result<(Menu, Items), 
         toggle,
         restart,
         autostart: autostart_item,
+        lan,
     };
     Ok((menu, items))
 }
@@ -212,6 +231,9 @@ impl Tray {
         put_icon(&items.toggle, image.clone());
         items.toggle.set_enabled(look.toggle_enabled);
         items.restart.set_enabled(look.restart_enabled);
+        if let Some(lan) = &items.lan {
+            lan.set_enabled(look.lan_enabled);
+        }
     }
 
     /// 照核心来的几行变了：整个菜单换一份，再照 `look` 画一遍。「开机时启动」照现在打的勾。
@@ -230,5 +252,12 @@ impl Tray {
     /// 「开机时启动」打不打勾。
     pub fn set_autostart(&self, on: bool) {
         self.items.autostart.set_checked(on);
+    }
+
+    /// 「局域网访问」打不打勾：点了托盘库自己先翻过去，照知道的翻回来，等核心推来的变动再改。
+    pub fn set_lan(&self, on: bool) {
+        if let Some(lan) = &self.items.lan {
+            lan.set_checked(on);
+        }
     }
 }

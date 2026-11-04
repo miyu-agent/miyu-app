@@ -37,15 +37,18 @@ fn only_switched_on_packages_with_a_tray_line_are_listed_by_id() {
 fn a_change_replaces_or_removes_one_package() {
     let mut packages = Packages::default();
     packages.replace(&listed());
-    packages.change(&json!({"package": "hello", "entry": {"package": "hello", "enabled": true, "status": "starting", "tray": {"name": "打开打招呼"}}}));
-    packages.change(&json!({"package": "miyu-im", "entry": null}));
-    packages.change(&json!({"package": "aaa", "entry": {"package": "aaa", "status": "program_missing", "tray": {"name": "看一眼"}}}));
+    // 只是变了的不算装卸。
+    assert!(!packages.change(&json!({"package": "hello", "entry": {"package": "hello", "enabled": true, "status": "starting", "tray": {"name": "打开打招呼"}}})));
+    assert!(packages.change(&json!({"package": "miyu-im", "entry": null})));
+    assert!(!packages.change(&json!({"package": "aaa", "entry": {"package": "aaa", "status": "program_missing", "tray": {"name": "看一眼"}}})));
+    assert!(packages.change(&json!({"package": "new", "entry": {"package": "new"}})));
+    assert!(!packages.change(&json!({"package": "gone", "entry": null})));
     assert_eq!(
         names(&packages),
         [("hello".to_string(), "打开打招呼".to_string())]
     );
     // 认不出的推送不动列表。
-    packages.change(&json!({"entry": null}));
+    assert!(!packages.change(&json!({"entry": null})));
     assert_eq!(packages.entries().len(), 1);
 }
 
@@ -56,4 +59,40 @@ fn an_empty_or_odd_reply_lists_nothing() {
     assert!(packages.entries().is_empty());
     packages.replace(&json!({"packages": [{"package": "x", "tray": {"name": ""}}, {"tray": {"name": "没编号"}}]}));
     assert!(packages.entries().is_empty());
+}
+
+#[test]
+fn loopback_is_off_and_anything_else_is_on() {
+    for off in [
+        "127.0.0.1",
+        "127.1.2.3",
+        "::1",
+        "[::1]",
+        "localhost",
+        " ",
+        "",
+    ] {
+        assert!(!lan_on(&json!(off)), "{off}");
+    }
+    assert!(!lan_on(&Value::Null));
+    for on in ["0.0.0.0", "::", "192.168.1.5", " 10.0.0.2 "] {
+        assert!(lan_on(&json!(on)), "{on}");
+    }
+}
+
+#[test]
+fn the_config_reply_says_on_off_or_unknown() {
+    let on = json!({"items": {"web.listen": {"value": "0.0.0.0", "origin": {"layer": "system"}}}});
+    let off =
+        json!({"items": {"web.listen": {"value": "127.0.0.1", "origin": {"layer": "default"}}}});
+    assert_eq!(lan_of(&on), Some(true));
+    assert_eq!(lan_of(&off), Some(false));
+    assert_eq!(lan_of(&json!({"items": {}})), None);
+}
+
+#[test]
+fn only_changes_to_the_listen_address_count() {
+    assert!(touches_listen(&json!({"web.listen": {}})));
+    assert!(!touches_listen(&json!({"ui.language": {}})));
+    assert!(!touches_listen(&Value::Null));
 }

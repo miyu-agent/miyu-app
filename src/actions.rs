@@ -6,6 +6,8 @@
 //! | 打开网页界面 | `miyu web` |
 //! | 设置… | `miyu web --settings`；旧网页不认这个参数（退出码 2）的，退回 `miyu web` |
 //! | 软件包挂的入口 | `miyu web --package <编号>`；退回同上 |
+//! | 局域网访问 | 连核心改 `web.listen`（见 `lan`）；要打开可是没设访问密码的，改成 `miyu web --settings access` |
+//! | 在手机上打开… | `miyu web --settings access`（网页设置「访问」那一组，局域网地址和二维码在那里，网页 W-1086）；退回同上 |
 //! | 停止 | `miyu web --stop`（网页 W-1091），再 `miyu core stop` |
 //! | 启动 | 照头的办法拉起核心：建好数据根的骨架，`connect_or_start` 拉起 `miyu core`（不开浏览器） |
 //! | 重新启动 | 先停核心再起（网页软件留着，页面接着连新的） |
@@ -25,7 +27,7 @@ use crate::link::Waker;
 use crate::program::{self, Ran, RunError};
 use crate::status::Busy;
 use crate::text::{Text, key};
-use crate::{about, log, quit};
+use crate::{about, lan, log, quit};
 
 /// 做事要用的几样：主程序、数据根、给人看的字、告诉界面的、叫连接再试的。
 #[derive(Clone)]
@@ -59,6 +61,8 @@ pub enum Page {
     Home,
     /// 设置（`--settings`，网页 W-1085）。
     Settings,
+    /// 设置「通用」页的「访问」那一组（`--settings access`，网页 W-1085）：访问密码、局域网地址和二维码。
+    Access,
     /// 一个软件包的后台页（`--package <编号>`，网页 F-6 下）。
     Package(String),
 }
@@ -69,6 +73,7 @@ impl Page {
         match self {
             Page::Home => program::WEB.to_vec(),
             Page::Settings => program::SETTINGS.to_vec(),
+            Page::Access => vec!["web", "--settings", "access"],
             Page::Package(package) => vec!["web", "--package", package],
         }
     }
@@ -77,25 +82,55 @@ impl Page {
 /// 用浏览器打开网页界面的 `page` 那一处。没在跑的由 `miyu web` 拉起核心、网页软件。
 pub fn open_web(ctx: &Ctx, page: Page) {
     let ctx = ctx.clone();
-    background("open-web", move || {
-        let Some(miyu) = ctx.miyu.as_deref() else {
-            tell(&ctx.text, key::NO_PROGRAM, "");
+    background("open-web", move || open_web_now(&ctx, &page));
+}
+
+/// 「局域网访问」点了，`on` 是现在开着没有：反过来设（见 `lan`）。要打开可是没设访问密码的，打开网页设置「访问」那一组先设。
+/// 设成了的不用管菜单：核心推来配置的变动，托盘那条连接再读一遍、改打勾。
+pub fn toggle_lan(ctx: &Ctx, on: bool) {
+    let ctx = ctx.clone();
+    background("lan", move || {
+        let Some(root) = ctx.root.as_ref() else {
+            tell(&ctx.text, key::LAN_FAILED, "");
             return;
         };
-        let mut got = run_logged(miyu, &page.args(), program::WEB_LIMIT);
-        if page != Page::Home && not_understood(&got) {
-            log::line(&format!(
-                "the web app does not know {page:?}, opening the web interface instead"
-            ));
-            got = run_logged(miyu, program::WEB, program::WEB_LIMIT);
+        match lan::set(root, !on) {
+            Ok(lan::Outcome::Done) => log::line(&format!("LAN access set to {}", !on)),
+            Ok(lan::Outcome::NeedsPassword) => {
+                log::line("no access password yet, opening the access settings");
+                open_web_now(&ctx, &Page::Access);
+            }
+            Err(failed) => {
+                let why = match failed {
+                    lan::Failed::Timeout => ctx.text.get(key::TIMEOUT).to_owned(),
+                    lan::Failed::Said(why) => why,
+                };
+                log::line(&format!("LAN access not changed: {why}"));
+                tell(&ctx.text, key::LAN_FAILED, &why);
+            }
         }
-        if let Some(detail) = failure(&got, &ctx.text) {
-            ctx.post.send(Event::Failed(detail.clone()));
-            tell(&ctx.text, key::OPEN_FAILED, &detail);
-        }
-        // 没在跑的由 `miyu web` 拉起来了：叫连接马上再试，不光等文件变动。
-        ctx.wake();
     });
+}
+
+/// 同 [`open_web`]，在调的这个线程里做。
+fn open_web_now(ctx: &Ctx, page: &Page) {
+    let Some(miyu) = ctx.miyu.as_deref() else {
+        tell(&ctx.text, key::NO_PROGRAM, "");
+        return;
+    };
+    let mut got = run_logged(miyu, &page.args(), program::WEB_LIMIT);
+    if *page != Page::Home && not_understood(&got) {
+        log::line(&format!(
+            "the web app does not know {page:?}, opening the web interface instead"
+        ));
+        got = run_logged(miyu, program::WEB, program::WEB_LIMIT);
+    }
+    if let Some(detail) = failure(&got, &ctx.text) {
+        ctx.post.send(Event::Failed(detail.clone()));
+        tell(&ctx.text, key::OPEN_FAILED, &detail);
+    }
+    // 没在跑的由 `miyu web` 拉起来了：叫连接马上再试，不光等文件变动。
+    ctx.wake();
 }
 
 /// 「停止」。界面已经写上「正在停止…」。

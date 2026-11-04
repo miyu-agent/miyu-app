@@ -5,10 +5,12 @@
 //! 连法同核心门面的 `Core::connect_running`（`miyu-client` 的 `connect::connect` 加同一句 `hello`），只是自己拿着这条连接（[`Rpc`]）：
 //! `Core` 只能一问一答，等不了「断了」，也收不了推送。网页软件跟着配置的那条连接（网页 `follow.rs`）也是这样写的。
 //!
-//! 握手以后（施工 AP-3）在这条连接上订 `packages` 流，菜单照它画，不定时去问：回应是整份软件包列表，之后推 `package.changed`，算出
-//! 软件包挂的入口（[`Packages`]）；掉了队（`resync`）的重新订。
+//! 握手以后（施工 AP-3）在这条连接上订两条流，菜单照它们画，不定时去问；掉了队（`resync`）的重新订：
+//! - `packages`：回应是整份软件包列表，之后推 `package.changed`，算出软件包挂的入口（[`Packages`]）；
+//! - `config`：先读一遍 `web.listen`，之后推来的 `config.changed` 里有它的再读一遍（局域网开没开）；装上、卸掉一个包也再读一遍
+//!   （核心这时不推 `config.changed`，网页软件的配置项跟着包有没有）。
 //!
-//! 「没有响应」：问出去的（握手、订阅）过了 [`rpc::SLOW`] 还没回报 [`Report::Slow`]，接着等，回了再报 [`Report::Up`]。连着、
+//! 「没有响应」：问出去的（握手、订阅、读配置）过了 [`rpc::SLOW`] 还没回报 [`Report::Slow`]，接着等，回了再报 [`Report::Up`]。连着、
 //! 托盘不问什么的时候不知道核心卡没卡住：不为这个定时去问。「出错了」的一种：握手被拒（本机令牌不对、协议版本谈不拢），报
 //! [`Report::Refused`] 带核心的原话。
 
@@ -21,7 +23,7 @@ use serde_json::{Value, json};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
-use crate::extras::{Entry, Packages};
+use crate::extras::{self, Entry, Packages};
 use crate::log;
 use crate::rpc::{self, Failure, Rpc};
 
@@ -43,6 +45,8 @@ pub enum Report {
     Refused(String),
     /// 软件包挂的入口（整份，照编号排）。
     Packages(Vec<Entry>),
+    /// 局域网开没开；`None` 是核心不认 `web.listen`（网页软件没装）。
+    Lan(Option<bool>),
 }
 
 /// 叫那条连接马上再试一次（托盘自己起停了核心以后）。
@@ -172,7 +176,7 @@ async fn session(root: &DataRoot, report: &dyn Fn(Report), was: &mut Option<bool
     }
 }
 
-/// 订 `packages` 流，照推送报软件包的入口。只在断了时回来。
+/// 订 `packages`、`config` 两条流，照推送报软件包的入口、局域网开没开。只在断了时回来。
 async fn streams<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
     rpc: &mut Rpc<R, W>,
     report: &dyn Fn(Report),
@@ -180,22 +184,32 @@ async fn streams<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
 ) -> Result<std::convert::Infallible, Failure> {
     let mut packages = Packages::default();
     subscribe_packages(rpc, &mut packages, report, slow).await?;
+    follow_config(rpc, report, slow).await?;
     loop {
         let push = rpc.push().await?;
         match push["method"].as_str().unwrap_or_default() {
             "package.changed" => {
-                packages.change(&push["params"]);
+                let installed_or_removed = packages.change(&push["params"]);
                 report(Report::Packages(packages.entries()));
+                // 装卸包不推 `config.changed`：网页软件装上、卸掉了，`web.listen` 也跟着有没有。
+                if installed_or_removed {
+                    read_lan(rpc, report, slow).await?;
+                }
             }
-            "resync" if push["params"]["stream"] == json!("packages") => {
-                subscribe_packages(rpc, &mut packages, report, slow).await?;
+            "config.changed" if extras::touches_listen(&push["params"]["keys"]) => {
+                read_lan(rpc, report, slow).await?;
             }
+            "resync" => match push["params"]["stream"].as_str() {
+                Some("packages") => subscribe_packages(rpc, &mut packages, report, slow).await?,
+                Some("config") => follow_config(rpc, report, slow).await?,
+                _ => {}
+            },
             _ => {}
         }
     }
 }
 
-/// 拒了的不算断：记一行，交 `None`（老核心不认），这条连接接着用。
+/// 拒了的不算断：记一行，交 `None`（老核心不认、网页软件没装），这条连接接着用。
 fn soft(method: &str, got: Result<Value, Failure>) -> Result<Option<Value>, Failure> {
     match got {
         Ok(value) => Ok(Some(value)),
@@ -221,6 +235,30 @@ async fn subscribe_packages<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
         packages.replace(&reply);
         report(Report::Packages(packages.entries()));
     }
+    Ok(())
+}
+
+async fn follow_config<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
+    rpc: &mut Rpc<R, W>,
+    report: &dyn Fn(Report),
+    slow: &mut dyn FnMut(bool),
+) -> Result<(), Failure> {
+    let params = json!({"stream": "config"});
+    soft(
+        "subscribe config",
+        rpc.call("subscribe", params, slow).await,
+    )?;
+    read_lan(rpc, report, slow).await
+}
+
+async fn read_lan<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
+    rpc: &mut Rpc<R, W>,
+    report: &dyn Fn(Report),
+    slow: &mut dyn FnMut(bool),
+) -> Result<(), Failure> {
+    let params = json!({"keys": [extras::LISTEN]});
+    let reply = soft("config.get", rpc.call("config.get", params, slow).await)?;
+    report(Report::Lan(reply.as_ref().and_then(extras::lan_of)));
     Ok(())
 }
 

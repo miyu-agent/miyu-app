@@ -81,6 +81,8 @@ pub struct Look {
     pub toggle_enabled: bool,
     /// 「重新启动」能不能点（这一行一直在，不能点时灰着）。
     pub restart_enabled: bool,
+    /// 「局域网访问」能不能点：只在运行中（改配置要连得上、答得上的核心）。
+    pub lan_enabled: bool,
 }
 
 /// 托盘知道的：连没连上核心、手上在做什么、最近出了什么错。
@@ -159,9 +161,10 @@ impl Status {
 }
 
 /// 照一种状态画那几行（照样板：正在启动时那一行是灰的「停止」，正在停止时是灰的「启动」；「重新启动」运行中、没有响应、
-/// 出错了时能点）。
-pub fn look(state: &State) -> Look {
+/// 出错了时能点）。`lan` 是局域网开着没有：运行中的写「运行中 · 局域网」。
+pub fn look(state: &State, lan: bool) -> Look {
     let (status, dot) = match state {
+        State::Running if lan => (key::STATUS_RUNNING_LAN, Dot::Green),
         State::Running => (key::STATUS_RUNNING, Dot::Green),
         State::Starting => (key::STATUS_STARTING, Dot::Yellow),
         State::Stopping => (key::STATUS_STOPPING, Dot::Yellow),
@@ -188,6 +191,7 @@ pub fn look(state: &State) -> Look {
             state,
             State::Running | State::Unresponsive | State::Failed(_)
         ),
+        lan_enabled: *state == State::Running,
     }
 }
 

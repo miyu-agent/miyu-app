@@ -57,7 +57,7 @@ pub struct App {
     ctx: Ctx,
     text: Arc<Text>,
     status: Status,
-    /// 照核心来的几行（软件包的入口）：变了把菜单整个换一份。
+    /// 照核心来的几行（软件包的入口、局域网）：变了把菜单整个换一份。
     extras: Extras,
     tray: Option<Tray>,
     /// 起来时开不开浏览器：开机拉起来的不开。
@@ -143,6 +143,13 @@ impl App {
                 }
                 return;
             }
+            Report::Lan(lan) => {
+                if lan != self.extras.lan {
+                    self.extras.lan = lan;
+                    self.rebuild();
+                }
+                return;
+            }
         }
         self.redraw();
     }
@@ -167,6 +174,18 @@ impl App {
             id::TOGGLE | id::RESTART => log::line("busy, start/stop ignored"),
             id::OPEN => actions::open_web(&self.ctx, Page::Home),
             id::SETTINGS => actions::open_web(&self.ctx, Page::Settings),
+            id::LAN => {
+                let on = self.extras.lan == Some(true);
+                if let Some(tray) = &self.tray {
+                    tray.set_lan(on);
+                }
+                if self.status.state() == status::State::Running {
+                    actions::toggle_lan(&self.ctx, on);
+                } else {
+                    log::line("not running, LAN access left alone");
+                }
+            }
+            id::PHONE => actions::open_web(&self.ctx, Page::Access),
             id::AUTOSTART => {
                 let on = actions::toggle_autostart(&self.ctx);
                 if let Some(tray) = &self.tray {
@@ -205,7 +224,7 @@ impl App {
     }
 
     fn look(&self) -> status::Look {
-        status::look(&self.status.state())
+        status::look(&self.status.state(), self.extras.lan == Some(true))
     }
 
     fn redraw(&self) {

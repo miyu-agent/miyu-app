@@ -1,5 +1,6 @@
 # トレイ自身の表示文字列。正本は中国語（zh.toml）。キーは三つとも同じにする。
 "status.running" = "実行中"
+"status.running_lan" = "実行中 · LAN"
 "status.starting" = "起動しています…"
 "status.stopping" = "停止しています…"
 "status.stopped" = "停止しました"
@@ -10,6 +11,8 @@
 "menu.restart" = "再起動"
 "menu.open" = "Web 画面を開く"
 "menu.settings" = "設定…"
+"menu.lan" = "LAN アクセス"
+"menu.phone" = "スマートフォンで開く…"
 "menu.autostart" = "ログイン時に起動"
 "menu.logs" = "ログのフォルダを開く"
 "menu.about" = "Miyu について"
@@ -19,6 +22,7 @@
 "error.start" = "Miyu を起動できませんでした。"
 "error.stop" = "Miyu を停止できませんでした。"
 "error.autostart" = "ログイン時の起動を変更できませんでした。"
+"error.lan" = "LAN アクセスを変更できませんでした。"
 "error.logs" = "ログはまだありません。Miyu を一度実行すると作られます。"
 "error.timeout" = "応答がないまま時間が過ぎました。"
 "about.app" = "トレイ"

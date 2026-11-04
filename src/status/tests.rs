@@ -72,7 +72,7 @@ fn a_stale_done_does_not_end_the_newer_work() {
 
 #[test]
 fn running_offers_stop_and_restart() {
-    let look = look(&State::Running);
+    let look = look(&State::Running, false);
     assert_eq!(look.status, key::STATUS_RUNNING);
     assert_eq!(look.dot, Dot::Green);
     assert_eq!((look.toggle, look.toggle_enabled), (Toggle::Stop, true));
@@ -81,7 +81,7 @@ fn running_offers_stop_and_restart() {
 
 #[test]
 fn stopped_offers_start_and_greys_restart() {
-    let look = look(&State::Stopped);
+    let look = look(&State::Stopped, false);
     assert_eq!(look.dot, Dot::Gray);
     assert_eq!((look.toggle, look.toggle_enabled), (Toggle::Start, true));
     assert!(!look.restart_enabled);
@@ -89,14 +89,14 @@ fn stopped_offers_start_and_greys_restart() {
 
 #[test]
 fn busy_greys_both_lines_and_keeps_them_in_place() {
-    let starting = look(&State::Starting);
+    let starting = look(&State::Starting, false);
     assert_eq!(
         (starting.toggle, starting.toggle_enabled),
         (Toggle::Stop, false)
     );
     assert!(!starting.restart_enabled);
     assert_eq!(starting.dot, Dot::Yellow);
-    let stopping = look(&State::Stopping);
+    let stopping = look(&State::Stopping, false);
     assert_eq!(
         (stopping.toggle, stopping.toggle_enabled),
         (Toggle::Start, false)
@@ -106,10 +106,10 @@ fn busy_greys_both_lines_and_keeps_them_in_place() {
 
 #[test]
 fn unresponsive_and_failed_have_their_look() {
-    let hung = look(&State::Unresponsive);
+    let hung = look(&State::Unresponsive, false);
     assert_eq!((hung.toggle, hung.toggle_enabled), (Toggle::Stop, true));
     assert!(hung.restart_enabled);
-    let failed = look(&State::Failed("旧版的数据根".into()));
+    let failed = look(&State::Failed("旧版的数据根".into()), false);
     assert_eq!(failed.dot, Dot::Red);
     assert_eq!(failed.reason.as_deref(), Some("旧版的数据根"));
     assert_eq!(
@@ -154,4 +154,25 @@ fn a_failure_shows_while_down_and_goes_once_linked_or_restarted() {
     assert_eq!(status.state(), State::Running);
     status.link(Linked::Down);
     assert_eq!(status.state(), State::Stopped);
+}
+
+#[test]
+fn running_with_the_lan_on_says_so_and_only_running_can_change_it() {
+    let lan = look(&State::Running, true);
+    assert_eq!(lan.status, key::STATUS_RUNNING_LAN);
+    assert_eq!(lan.dot, Dot::Green);
+    assert!(lan.lan_enabled);
+    assert_eq!(look(&State::Running, false).status, key::STATUS_RUNNING);
+    // 别的状态不写「局域网」，也改不了。
+    for state in [
+        State::Starting,
+        State::Stopping,
+        State::Stopped,
+        State::Unresponsive,
+        State::Failed("x".into()),
+    ] {
+        let got = look(&state, true);
+        assert_ne!(got.status, key::STATUS_RUNNING_LAN, "{state:?}");
+        assert!(!got.lan_enabled, "{state:?}");
+    }
 }

@@ -11,6 +11,7 @@ mod extras;
 mod folder;
 mod icon;
 mod instance;
+mod lan;
 mod link;
 mod log;
 mod program;

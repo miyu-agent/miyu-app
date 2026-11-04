@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 /// 代码里用的键。
 pub mod key {
     pub const STATUS_RUNNING: &str = "status.running";
+    pub const STATUS_RUNNING_LAN: &str = "status.running_lan";
     pub const STATUS_STARTING: &str = "status.starting";
     pub const STATUS_STOPPING: &str = "status.stopping";
     pub const STATUS_STOPPED: &str = "status.stopped";
@@ -16,6 +17,8 @@ pub mod key {
     pub const RESTART: &str = "menu.restart";
     pub const OPEN: &str = "menu.open";
     pub const SETTINGS: &str = "menu.settings";
+    pub const LAN: &str = "menu.lan";
+    pub const PHONE: &str = "menu.phone";
     pub const AUTOSTART: &str = "menu.autostart";
     pub const LOGS: &str = "menu.logs";
     pub const ABOUT: &str = "menu.about";
@@ -25,6 +28,7 @@ pub mod key {
     pub const START_FAILED: &str = "error.start";
     pub const STOP_FAILED: &str = "error.stop";
     pub const AUTOSTART_FAILED: &str = "error.autostart";
+    pub const LAN_FAILED: &str = "error.lan";
     pub const LOGS_FAILED: &str = "error.logs";
     pub const TIMEOUT: &str = "error.timeout";
     pub const ABOUT_APP: &str = "about.app";
@@ -35,8 +39,9 @@ pub mod key {
 
 /// 上面每一个键，测试查三份里都有。
 #[cfg(test)]
-const KEYS: [&str; 26] = [
+const KEYS: [&str; 30] = [
     key::STATUS_RUNNING,
+    key::STATUS_RUNNING_LAN,
     key::STATUS_STARTING,
     key::STATUS_STOPPING,
     key::STATUS_STOPPED,
@@ -47,6 +52,8 @@ const KEYS: [&str; 26] = [
     key::RESTART,
     key::OPEN,
     key::SETTINGS,
+    key::LAN,
+    key::PHONE,
     key::AUTOSTART,
     key::LOGS,
     key::ABOUT,
@@ -56,6 +63,7 @@ const KEYS: [&str; 26] = [
     key::START_FAILED,
     key::STOP_FAILED,
     key::AUTOSTART_FAILED,
+    key::LAN_FAILED,
     key::LOGS_FAILED,
     key::TIMEOUT,
     key::ABOUT_APP,

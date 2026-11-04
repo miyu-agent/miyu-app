@@ -47,6 +47,7 @@ fn success_says_nothing_and_failures_say_why() {
 fn each_page_has_its_arguments() {
     assert_eq!(Page::Home.args(), ["web"]);
     assert_eq!(Page::Settings.args(), ["web", "--settings"]);
+    assert_eq!(Page::Access.args(), ["web", "--settings", "access"]);
     assert_eq!(
         Page::Package("miyu-im".into()).args(),
         ["web", "--package", "miyu-im"]

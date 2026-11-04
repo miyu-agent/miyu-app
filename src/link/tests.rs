@@ -81,7 +81,7 @@ fn real_core() -> (PathBuf, DataRoot) {
     (miyu, root)
 }
 
-/// 拿真的核心走一遍：托盘那条连接起来先报连不上；拉起以后连上、报一次软件包的入口（出厂的包都没写 `[tray]`）；`miyu core stop`
+/// 拿真的核心走一遍：托盘那条连接起来先报连不上；拉起以后连上、报一次软件包的入口（出厂的包都没写 `[tray]`）和局域网（出厂不是开着的）；`miyu core stop`
 /// 以后报断。要人手跑：`MIYU_HOME=$(mktemp -d) MIYU_RESOURCES=<资源目录> MIYU_TEST_PROGRAM=<miyu> cargo test -- --ignored a_real_core`。
 /// 只靠盯 `run/` 的文件变动跟上（没人叫醒）。
 #[test]
@@ -98,6 +98,9 @@ fn a_real_core_goes_up_and_down() {
     until(&receive, |got| *got == Report::Up);
     let packages = until(&receive, |got| matches!(got, Report::Packages(_)));
     assert_eq!(packages, Report::Packages(Vec::new()), "出厂的包都不挂托盘");
+    let lan = until(&receive, |got| matches!(got, Report::Lan(_)));
+    // 资源目录带网页包的报关着，不带的报不认（`None`）：都不是开着。
+    assert_ne!(lan, Report::Lan(Some(true)), "出厂只听本机");
     let text = crate::text::Text::of(crate::text::Lang::En);
     crate::quit::stop_core(&miyu, &text).unwrap();
     until(&receive, |got| *got == Report::Down);

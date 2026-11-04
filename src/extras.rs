@@ -1,11 +1,19 @@
-//! 菜单上照核心来的那几行（图纸 `app.md` 第 4 条）：软件包挂的入口（核心 TR-2）。只有读和算，不碰界面、不碰连接，单测钉住。
+//! 菜单上照核心来的两组（图纸 `app.md` 第 4 条）：软件包挂的入口（核心 TR-2）、局域网（网页的 `web.listen`）。只有读和算，不碰界面、
+//! 不碰连接，单测钉住。
 //!
 //! - 软件包：`subscribe {stream: "packages"}` 的回应是整份列表，之后推 `package.changed {package, entry}`（没有了的 `entry` 是 `null`）。
 //!   一项带 `tray: {name}`（有后台页、清单写了 `[tray]`，名字照连接的语言挑好的）、开着的才列，一个包一行，照编号排（同 `package.list`）。
+//! - 局域网：`config.get {keys: ["web.listen"]}`；照网页设置页的认法（网页 `account.js` 的 `loopbackOnly`）：回环（`127.*`、`::1`、
+//!   `localhost`、空的）是关，别的（`0.0.0.0`、这台电脑的某一个地址）是开。
 
 use std::collections::BTreeMap;
 
 use serde_json::Value;
+
+/// 跟着的配置项：网页软件听哪个地址。
+pub const LISTEN: &str = "web.listen";
+/// 打开局域网写的值（同网页设置页）。关掉是恢复默认（`unset`，出厂的 `127.0.0.1`）。
+pub const ANY: &str = "0.0.0.0";
 
 /// 托盘菜单里一个软件包的一行。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,18 +41,18 @@ impl Packages {
             .collect();
     }
 
-    /// 推来的 `package.changed` 的参数：换掉、删掉那一项。
-    pub fn change(&mut self, params: &Value) {
+    /// 推来的 `package.changed` 的参数：换掉、删掉那一项。交回是不是装上、卸掉了一个包（不只是状态变了）：装卸包不推
+    /// `config.changed`，包带的配置项（例如网页软件的 `web.listen`）有没有跟着它变。
+    pub fn change(&mut self, params: &Value) -> bool {
         let Some(package) = params["package"].as_str() else {
-            return;
+            return false;
         };
         match &params["entry"] {
-            Value::Null => {
-                self.items.remove(package);
-            }
-            entry => {
-                self.items.insert(package.to_string(), entry.clone());
-            }
+            Value::Null => self.items.remove(package).is_some(),
+            entry => self
+                .items
+                .insert(package.to_string(), entry.clone())
+                .is_none(),
         }
     }
 
@@ -72,6 +80,32 @@ fn switched_on(item: &Value) -> bool {
             item["status"].as_str(),
             Some("off" | "program_missing" | "depends_missing")
         )
+}
+
+/// `web.listen` 的值是不是听局域网。
+pub fn lan_on(listen: &Value) -> bool {
+    let value = listen
+        .as_str()
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_lowercase();
+    !(value.is_empty()
+        || value == "localhost"
+        || value == "::1"
+        || value == "[::1]"
+        || value.starts_with("127."))
+}
+
+/// `config.get` 的回应里局域网开没开；没有这一项的（网页软件没装）交 `None`。
+pub fn lan_of(reply: &Value) -> Option<bool> {
+    reply["items"]
+        .get(LISTEN)
+        .map(|item| lan_on(&item["value"]))
+}
+
+/// 推来的 `config.changed` 的 `keys` 里有没有 `web.listen`。
+pub fn touches_listen(keys: &Value) -> bool {
+    keys.get(LISTEN).is_some()
 }
 
 #[cfg(test)]

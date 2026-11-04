@@ -1,5 +1,6 @@
 # The tray's own text. Chinese (zh.toml) is the original; keep the keys the same in all three.
 "status.running" = "Running"
+"status.running_lan" = "Running · LAN"
 "status.starting" = "Starting…"
 "status.stopping" = "Stopping…"
 "status.stopped" = "Stopped"
@@ -10,6 +11,8 @@
 "menu.restart" = "Restart"
 "menu.open" = "Open Web Interface"
 "menu.settings" = "Settings…"
+"menu.lan" = "LAN Access"
+"menu.phone" = "Open on Your Phone…"
 "menu.autostart" = "Start at Login"
 "menu.logs" = "Open Log Folder"
 "menu.about" = "About Miyu"
@@ -19,6 +22,7 @@
 "error.start" = "Miyu didn't start."
 "error.stop" = "Miyu didn't stop."
 "error.autostart" = "Couldn't change Start at Login."
+"error.lan" = "Couldn't change LAN access."
 "error.logs" = "No logs yet: they appear after Miyu has run once."
 "error.timeout" = "No answer for too long."
 "about.app" = "Tray"
