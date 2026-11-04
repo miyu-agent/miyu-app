@@ -47,7 +47,7 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          over=$(find src xtask/src -name '*.rs' -print0 | xargs -0 wc -l | awk '$2 != "total" && $1 > 500 {print}')
+          over=$(find src xtask/src build.rs -name '*.rs' -print0 | xargs -0 wc -l | awk '$2 != "total" && $1 > 500 {print}')
           if [ -n "$over" ]; then echo "超过 500 行：" && echo "$over" && exit 1; fi
       # 施工 AP-5（原来外壳的 DT-7）：四个平台的第三方依赖都能和 AGPL 合在一起发，第三方许可证清单是最新的。
       # cargo metadata --filter-platform 不用装别的目标，Linux 上一台查完四个。
