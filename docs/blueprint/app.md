@@ -24,7 +24,7 @@
 2. **打开网页界面**：跑 `miyu web`（核心、网页服务没在跑的由它拉起；带交接票，经跳转页交给系统的浏览器，网页 `web-ui.md`「二、miyu web」）。起来那一下开一次；托盘菜单「打开网页界面」、点托盘图标（Windows、Linux 左键）再开。浏览器装成了应用（网页的应用清单，见「网页要配的」）的，系统照它开成独立窗口。
 3. **点托盘图标**：Windows、Linux 左键直接「打开网页界面」，右键出菜单；macOS 照菜单栏的习惯，点一下就出菜单。
    - Linux 照 StatusNotifierItem 走（2026-11-04 项目主人定换，AP-3 做）：AP-2 用的 `tray-icon` 默认 AppIndicator 后端不给程序图标的点击，左键、右键都是出菜单；换成 `tray-icon` 0.26 的 `ksni` 后端，直接在会话的 D-Bus 上说 StatusNotifierItem：左键是托盘宿主调的 `Activate`，托盘照它打开网页界面；右键宿主照 dbusmenu 自己画菜单。不再要 libayatana-appindicator，多一套纯 Rust 的 zbus；GTK 照旧要（事件循环 `tao`、消息框 `rfd`）。没有 StatusNotifierItem 宿主的托盘（只认 XEmbed 的老托盘、没装 AppIndicator 扩展的 GNOME）显示不出图标，AppIndicator 原来在这种地方退回 GTK 的老图标，现在没有了。中键（宿主调 `SecondaryActivate`）不做事。
-4. **托盘菜单**（照 oMLX 菜单栏的那一份：头一行状态，下面按用途分组，组之间一根分隔线；只放人会来点的东西，别的都在网页里。2026-11-03 项目主人看过可交互的样板定：https://claude.ai/artifact/WWVU3J6jpQeBryGB84ZJqH）。从上往下：
+4. **托盘菜单**（照 oMLX 菜单栏的那一份：头一行状态，下面按用途分组，组之间一根分隔线；只放人会来点的东西，别的都在网页里。2026-11-03 项目主人看过可交互的样板定：https://claude.ai/artifact/WWVU3J6jpQeBryGB84ZJqH（样板页 2026-11-04 已删，菜单照下面写的））。从上往下：
    - **状态行**（灰字、前面一个小圆点，不能点）：
      - 「运行中」（绿点），局域网开着的写「运行中 · 局域网」；
      - 「正在启动…」「正在停止…」（黄点）、「已停止」（灰点）、「没有响应」（黄点，连得上、问不出话）；

@@ -101,3 +101,14 @@
 - 提交：`200becf` 依赖、`2fcc10c` 系统通知，以及补这一节的那一个。
 - CI（`ci.yml`）：运行 41808854481（`2fcc10c`）Linux、macOS、Windows 三台都绿。
 - 打包（`release.yml`）：运行 41808854518（`2fcc10c`）三台都绿。下了 Windows 的中文 MSI 查字符串表：`System.AppUserModel.ID` 和 `io.github.miyu-agent.miyu-app` 都在（开始菜单快捷方式带着应用身份）；装上以后快捷方式上真有没有，手测时用 PowerShell 看一眼（`(New-Object -ComObject Shell.Application)` 读不出这一格，用 `Get-StartApps | ? Name -eq Miyu` 看 `AppID` 是不是它）。
+
+### Windows 虚拟机上手测（2026-11-04，Win11 26200，装打包运行 41813382751 的中文 MSI：AP-4 + 核心 61f1f3ef2 + 网页 0.1.0）
+
+数据根另指空目录，模型照宿主上的假模型（只听宿主的局域网地址，回答慢 20 秒）。网页里说一句、马上关掉浏览器，等通知。测完删了数据根、计划任务、临时自动登录，虚拟显示器启用回去，关机；持久配置和测之前逐字一样。
+
+- `Get-StartApps`：名字「Miyu」，AppID `io.github.miyu-agent.miyu-app`。
+- 后台会话答完：右下角弹横幅，来源「Miyu」、Miyu 的图标，标题是那句话（「hi」「again」），正文「回答完了」，下面一个「打开」按钮。
+- **点「打开」按钮**：打开那个会话（日志 `notification <会话>:done clicked`，接着 `miyu web --session <会话>`，浏览器里是那一轮）。
+- **点横幅本身**：横幅收掉，托盘收不到（日志里没有 clicked）。**收进通知中心以后再点**：同样收不到。库（tauri-winrt-notification 0.8.1）的 toast 没有 `launch`，正文点了 Windows 不交回 `Activated`，只有带 `arguments` 的按钮交回；要点正文也打开，得自己拼带 `launch` 的 toast（WinRT 的接口在 windows 那个 crate 里是安全的 Rust，不用 `unsafe`），排成后续。
+- 同一个会话的几条在通知中心里摞在一起（「+2 个通知」），不换掉上一条，同上面「风险」里写的。
+- 没测：「等你确认」「等你回答」、网页开着那个会话时只有网页弹、退出托盘以后网页照原来弹。
