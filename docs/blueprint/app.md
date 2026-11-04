@@ -23,7 +23,7 @@
    - 开机拉起来的（带 `--autostart`）碰到已经在跑的，什么都不做就退。macOS 上点程序坞、再开一次（系统不起第二个，发「重新打开」）同样打开网页界面。
 2. **打开网页界面**：跑 `miyu web`（核心、网页服务没在跑的由它拉起；带交接票，经跳转页交给系统的浏览器，网页 `web-ui.md`「二、miyu web」）。起来那一下开一次；托盘菜单「打开网页界面」、点托盘图标（Windows、Linux 左键）再开。浏览器装成了应用（网页的应用清单，见「网页要配的」）的，系统照它开成独立窗口。
 3. **点托盘图标**：Windows、Linux 左键直接「打开网页界面」，右键出菜单；macOS 照菜单栏的习惯，点一下就出菜单。
-   - Linux 实际做不到（AP-2）：`tray-icon` 默认的 AppIndicator 后端不给程序图标的点击，左键、右键都是出菜单，「打开网页界面」是菜单里打开那一组的第一行。`tray-icon` 0.26 另有 `ksni` 后端（直接走 StatusNotifierItem，左键报得上来，不要 libayatana-appindicator，要 D-Bus 的 zbus 那一套），换不换等项目主人定。
+   - Linux 照 StatusNotifierItem 走（2026-11-04 项目主人定换，AP-3 做）：AP-2 用的 `tray-icon` 默认 AppIndicator 后端不给程序图标的点击，左键、右键都是出菜单；换成 `tray-icon` 0.26 的 `ksni` 后端，直接在会话的 D-Bus 上说 StatusNotifierItem：左键是托盘宿主调的 `Activate`，托盘照它打开网页界面；右键宿主照 dbusmenu 自己画菜单。不再要 libayatana-appindicator，多一套纯 Rust 的 zbus；GTK 照旧要（事件循环 `tao`、消息框 `rfd`）。没有 StatusNotifierItem 宿主的托盘（只认 XEmbed 的老托盘、没装 AppIndicator 扩展的 GNOME）显示不出图标，AppIndicator 原来在这种地方退回 GTK 的老图标，现在没有了。中键（宿主调 `SecondaryActivate`）不做事。
 4. **托盘菜单**（照 oMLX 菜单栏的那一份：头一行状态，下面按用途分组，组之间一根分隔线；只放人会来点的东西，别的都在网页里。2026-11-03 项目主人看过可交互的样板定：https://claude.ai/artifact/WWVU3J6jpQeBryGB84ZJqH）。从上往下：
    - **状态行**（灰字、前面一个小圆点，不能点）：
      - 「运行中」（绿点），局域网开着的写「运行中 · 局域网」；
@@ -97,4 +97,4 @@ core1 2026-11-03 答复：
 - 留下：托盘、单实例、调主程序（`program.rs`）、叫核心停（`quit.rs`）、日志（`log.rs`）、给人看的字、图标、打包流水线、许可证门禁和清单、随包的 PowerShell 7。
 - 去掉：窗口、网页视图、导航和下载交给谁（`navigate.rs`、`download.rs`）、网页视图的通知替身（`notify.rs`、`resources/notification.js`）、macOS 的应用菜单（`menu.rs`）、窗口大小。
 - 分支 `step/DT-8-通知`（DT-7、DT-8、DT-9）不照原样合：许可证（DT-7）、PowerShell 7（DT-9）挪进 AP-5；DT-8 的通知是给网页视图的，不要了，系统通知改成第 5 条。
-- 程序换框架：只要托盘，不要网页视图，Tauri 换成更小的 `tray-icon` + `tao`（Tauri 自己的托盘就是它们），三个平台一份代码。AP-2 做了：`tao` 0.37.2（关了默认功能）、`tray-icon` 0.26.1（Linux 用 AppIndicator 后端）、`rfd` 0.17.2（消息框，Linux 用 GTK 画）、`notify` 8.2.1、`png`、`open`、`tokio`，`winreg`（只 Windows）；核心照 git 依赖钉 `miyu-client`（核心 main `d58f7b099`，同 `pins.toml` 的核心）。打包还用 Tauri 的打包工具：先 `cargo build --release`，再 `cargo tauri bundle`（`cargo tauri build` 总带 `tauri/custom-protocol` 特性，没有 tauri 依赖编不过），`tauri.conf.json` 只当打包配置；换不换留给 AP-5。
+- 程序换框架：只要托盘，不要网页视图，Tauri 换成更小的 `tray-icon` + `tao`（Tauri 自己的托盘就是它们），三个平台一份代码。AP-2 做了：`tao` 0.37.2（关了默认功能）、`tray-icon` 0.26.1（Linux 用 AppIndicator 后端；AP-3 换成 `ksni` 后端，见第 3 条）、`rfd` 0.17.2（消息框，Linux 用 GTK 画）、`notify` 8.2.1、`png`、`open`、`tokio`，`winreg`（只 Windows）；核心照 git 依赖钉 `miyu-client`（核心 main `d58f7b099`，同 `pins.toml` 的核心）。打包还用 Tauri 的打包工具：先 `cargo build --release`，再 `cargo tauri bundle`（`cargo tauri build` 总带 `tauri/custom-protocol` 特性，没有 tauri 依赖编不过），`tauri.conf.json` 只当打包配置；换不换留给 AP-5。

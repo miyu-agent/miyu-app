@@ -8,8 +8,8 @@
 //! 6. 「开机时启动」（打勾）、「打开日志所在的文件夹」；
 //! 7. 「关于 Miyu」、「退出 Miyu」（带图标；macOS 带 ⌘Q）。
 //!
-//! 点图标：Windows 左键「打开网页界面」、右键出菜单；macOS 点了出菜单。Linux 的 AppIndicator 不给程序图标的点击，左键、右键都是
-//! 出菜单（托盘库的限制，`tray-icon` 文档写明）。菜单的事件在 `app` 里统一接。
+//! 点图标：Windows、Linux 左键「打开网页界面」、右键出菜单；macOS 点了出菜单。Linux 上托盘库走 ksni 后端（施工 AP-3）：直接说
+//! StatusNotifierItem，左键是宿主调的 `Activate`，右键宿主照 dbusmenu 自己画菜单。菜单的事件在 `app` 里统一接。
 
 use tray_icon::menu::{
     CheckMenuItem, Icon as MenuIcon, IconMenuItem, Menu, MenuItem, PredefinedMenuItem,
@@ -71,7 +71,7 @@ fn shortcut(_: &str) -> Option<tray_icon::menu::accelerator::Accelerator> {
 /// 建托盘图标和菜单，先照 `look` 画一遍。
 ///
 /// # Errors
-/// 建不出（Linux 上没有 `libayatana-appindicator` 这些、没有托盘）。
+/// 建不出（Linux 上连不上会话的 D-Bus）。
 pub fn create(text: &Text, look: &Look, autostart: bool) -> Result<Tray, String> {
     let status = IconMenuItem::with_id(id::STATUS, "", false, None, None);
     let toggle = IconMenuItem::with_id(id::TOGGLE, "", false, None, None);
@@ -139,7 +139,7 @@ pub fn create(text: &Text, look: &Look, autostart: bool) -> Result<Tray, String>
         .with_id("miyu")
         .with_tooltip("Miyu")
         .with_menu(Box::new(menu))
-        // macOS 点了出菜单；Windows 左键交给程序（打开网页界面），右键出菜单。
+        // macOS 点了出菜单；Windows 左键交给程序（打开网页界面），右键出菜单。Linux 的 ksni 后端不看这一项：左键总是报给程序。
         .with_menu_on_left_click(cfg!(target_os = "macos"))
         .build()
         .map_err(|error| error.to_string())?;

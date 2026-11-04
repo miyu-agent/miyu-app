@@ -19,7 +19,6 @@
       "deb": {
         "depends": [
           "libgtk-3-0",
-          "libayatana-appindicator3-1",
           "bubblewrap"
         ],
         "files": {
@@ -30,7 +29,6 @@
       "rpm": {
         "depends": [
           "gtk3",
-          "libayatana-appindicator-gtk3",
           "bubblewrap"
         ],
         "files": {

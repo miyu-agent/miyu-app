@@ -11,7 +11,9 @@ publish = false
 # tray-icon、tao 是 Tauri 自己用的托盘和事件循环（施工 AP-2：Tauri 换成它们，不要网页视图）。
 [dependencies]
 tao = { version = "=0.37.2", default-features = false }
-tray-icon = "=0.26.1"
+# Linux 上走 ksni 后端（直接说 StatusNotifierItem，施工 AP-3，2026-11-04 项目主人定）：左键报得上来，不要 libayatana-appindicator；
+# 代价是多一套 D-Bus 的 zbus（纯 Rust）。Windows、macOS 不受这个特性影响。
+tray-icon = { version = "=0.26.1", default-features = false, features = ["ksni"] }
 # 系统原生的消息框（关于、出错）。Linux 上用 GTK 画（tao 本来就要 GTK），不用默认的 xdg 门户那一套。
 rfd = { version = "=0.17.2", default-features = false, features = ["gtk3"] }
 # 盯数据根的 `run/`（别人把核心拉起来了）、单实例「请打开」的文件。

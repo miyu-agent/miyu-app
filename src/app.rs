@@ -154,7 +154,7 @@ impl App {
         }
     }
 
-    /// 点了托盘图标：Windows 左键「打开网页界面」（右键托盘库自己出菜单）。macOS 点了出菜单，Linux 收不到点击。
+    /// 点了托盘图标：Windows、Linux 左键「打开网页界面」（右键托盘库、Linux 的托盘宿主自己出菜单）。macOS 点了出菜单。
     fn clicked(&mut self, event: &TrayIconEvent) {
         if cfg!(target_os = "macos") {
             return;
