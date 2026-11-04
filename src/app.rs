@@ -12,6 +12,7 @@ use crate::instance::Once;
 use crate::link::Report;
 use crate::status::{self, Busy, Linked, Status};
 use crate::text::Text;
+use crate::toast::Toaster;
 use crate::tray::{self, Extras, Tray, id};
 use crate::{autostart, log};
 
@@ -32,6 +33,8 @@ pub enum Event {
     Failed(String),
     /// 有人要打开网页界面：第二个起来的托盘、macOS 上点了程序坞或者再开一次。
     Open,
+    /// 点了系统通知：打开那个会话；账号级的提醒（没有会话的）打开网页界面。
+    Clicked(Option<String>),
     /// 「退出 Miyu」停完了，现在退。
     Exit,
 }
@@ -60,6 +63,8 @@ pub struct App {
     /// 照核心来的几行（软件包的入口、局域网）：变了把菜单整个换一份。
     extras: Extras,
     tray: Option<Tray>,
+    /// 弹系统通知的（施工 AP-4）。
+    toaster: Toaster,
     /// 起来时开不开浏览器：开机拉起来的不开。
     open_at_start: bool,
     /// 在退了：别的事不再接。
@@ -69,7 +74,7 @@ pub struct App {
 
 impl App {
     /// `problem` 是起来时就知道的错（找不到数据根、找不到主程序），状态行照它写「出错了」。
-    pub fn new(ctx: Ctx, open_at_start: bool, problem: Option<String>) -> Self {
+    pub fn new(ctx: Ctx, toaster: Toaster, open_at_start: bool, problem: Option<String>) -> Self {
         let mut status = Status::default();
         if let Some(problem) = problem {
             status.fail(problem);
@@ -80,6 +85,7 @@ impl App {
             status,
             extras: Extras::default(),
             tray: None,
+            toaster,
             open_at_start,
             quitting: false,
             asked: Once::default(),
@@ -121,6 +127,10 @@ impl App {
                     actions::open_web(&self.ctx, Page::Home);
                 }
             }
+            Event::Clicked(session) => {
+                let page = session.map_or(Page::Home, Page::Session);
+                actions::open_web(&self.ctx, page);
+            }
         }
     }
 
@@ -148,6 +158,10 @@ impl App {
                     self.extras.lan = lan;
                     self.rebuild();
                 }
+                return;
+            }
+            Report::Note(note) => {
+                self.toaster.show(note);
                 return;
             }
         }

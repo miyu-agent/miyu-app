@@ -5,6 +5,7 @@
 
 mod about;
 mod actions;
+mod alerts;
 mod app;
 mod autostart;
 mod extras;
@@ -19,6 +20,7 @@ mod quit;
 mod rpc;
 mod status;
 mod text;
+mod toast;
 mod tray;
 
 use std::sync::Arc;
@@ -128,7 +130,11 @@ fn main() {
         post,
         waker,
     };
-    let mut app = App::new(ctx, !autostarted, problem);
+    let clicked = ctx.post.clone();
+    let toaster = toast::Toaster::new(Arc::clone(&text), own.as_deref(), move |session| {
+        clicked.send(Event::Clicked(session));
+    });
+    let mut app = App::new(ctx, toaster, !autostarted, problem);
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
         match event {

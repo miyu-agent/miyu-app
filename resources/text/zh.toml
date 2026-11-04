@@ -29,3 +29,11 @@
 "about.core" = "核心"
 "about.web" = "网页"
 "about.unknown" = "不知道"
+# 系统通知（图纸 app.md 第 5 条）：正文同网页 notify 包的那几句，两边一样；「打开」是通知上的按钮（有的系统点通知本身就是它）。
+"notify.done" = "回答完了"
+"notify.ask" = "等你回答"
+"notify.approve" = "等你确认"
+"notify.schedule_ran" = "定时任务跑完了"
+"notify.schedule_failed" = "定时任务没跑完"
+"notify.schedules_reset" = "定时任务的记录坏了，已换成新的一份，原来的定时任务都没了"
+"notify.open" = "打开"

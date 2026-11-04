@@ -1,5 +1,5 @@
-//! 托盘自己给人看的字（图纸 `app.md` 第 4 条）：托盘菜单、对话框。照系统的语言挑一份，中文、日文、英文，别的用英文；不问核心的
-//! `ui.language`（托盘起来时核心不一定在跑）。三份住在 `resources/text/`，编进程序。
+//! 托盘自己给人看的字（图纸 `app.md` 第 4、5 条）：托盘菜单、对话框、系统通知。照系统的语言挑一份，中文、日文、英文，别的用
+//! 英文；不问核心的 `ui.language`（托盘起来时核心不一定在跑）。三份住在 `resources/text/`，编进程序。
 
 use std::collections::BTreeMap;
 
@@ -35,11 +35,18 @@ pub mod key {
     pub const ABOUT_CORE: &str = "about.core";
     pub const ABOUT_WEB: &str = "about.web";
     pub const ABOUT_UNKNOWN: &str = "about.unknown";
+    pub const NOTIFY_DONE: &str = "notify.done";
+    pub const NOTIFY_ASK: &str = "notify.ask";
+    pub const NOTIFY_APPROVE: &str = "notify.approve";
+    pub const NOTIFY_SCHEDULE_RAN: &str = "notify.schedule_ran";
+    pub const NOTIFY_SCHEDULE_FAILED: &str = "notify.schedule_failed";
+    pub const NOTIFY_SCHEDULES_RESET: &str = "notify.schedules_reset";
+    pub const NOTIFY_OPEN: &str = "notify.open";
 }
 
 /// 上面每一个键，测试查三份里都有。
 #[cfg(test)]
-const KEYS: [&str; 30] = [
+const KEYS: [&str; 37] = [
     key::STATUS_RUNNING,
     key::STATUS_RUNNING_LAN,
     key::STATUS_STARTING,
@@ -70,6 +77,13 @@ const KEYS: [&str; 30] = [
     key::ABOUT_CORE,
     key::ABOUT_WEB,
     key::ABOUT_UNKNOWN,
+    key::NOTIFY_DONE,
+    key::NOTIFY_ASK,
+    key::NOTIFY_APPROVE,
+    key::NOTIFY_SCHEDULE_RAN,
+    key::NOTIFY_SCHEDULE_FAILED,
+    key::NOTIFY_SCHEDULES_RESET,
+    key::NOTIFY_OPEN,
 ];
 
 /// 一种语言。

@@ -7,6 +7,7 @@
 //! | 设置… | `miyu web --settings`；旧网页不认这个参数（退出码 2）的，退回 `miyu web` |
 //! | 软件包挂的入口 | `miyu web --package <编号>`；退回同上 |
 //! | 局域网访问 | 连核心改 `web.listen`（见 `lan`）；要打开可是没设访问密码的，改成 `miyu web --settings access` |
+//! | 点了系统通知 | `miyu web --session <编号>`（网页 W-1085）；账号级的提醒 `miyu web`；退回同上 |
 //! | 在手机上打开… | `miyu web --settings access`（网页设置「访问」那一组，局域网地址和二维码在那里，网页 W-1086）；退回同上 |
 //! | 停止 | `miyu web --stop`（网页 W-1091），再 `miyu core stop` |
 //! | 启动 | 照头的办法拉起核心：建好数据根的骨架，`connect_or_start` 拉起 `miyu core`（不开浏览器） |
@@ -65,6 +66,8 @@ pub enum Page {
     Access,
     /// 一个软件包的后台页（`--package <编号>`，网页 F-6 下）。
     Package(String),
+    /// 一个会话（`--session <编号>`，网页 W-1085）：点了系统通知。
+    Session(String),
 }
 
 impl Page {
@@ -75,6 +78,7 @@ impl Page {
             Page::Settings => program::SETTINGS.to_vec(),
             Page::Access => vec!["web", "--settings", "access"],
             Page::Package(package) => vec!["web", "--package", package],
+            Page::Session(session) => vec!["web", "--session", session],
         }
     }
 }

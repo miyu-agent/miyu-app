@@ -52,4 +52,8 @@ fn each_page_has_its_arguments() {
         Page::Package("miyu-im".into()).args(),
         ["web", "--package", "miyu-im"]
     );
+    assert_eq!(
+        Page::Session("019a-1".into()).args(),
+        ["web", "--session", "019a-1"]
+    );
 }

@@ -10,12 +10,16 @@
 //! - `config`：先读一遍 `web.listen`，之后推来的 `config.changed` 里有它的再读一遍（局域网开没开）；装上、卸掉一个包也再读一遍
 //!   （核心这时不推 `config.changed`，网页软件的配置项跟着包有没有）。
 //!
+//! 系统通知（施工 AP-4，图纸第 5 条）：握手以后先 `notices.claim`（核心 TR-1），说「后台通知由托盘来发」，核心照这条连接记、
+//! 断了就作废；断了重连的照旧再认领一次（每连一次从头来）。认领成了再订会话表和提醒（`notices`），见 [`notices`]；老核心不认的
+//! 不发：这时网页还在照原来的弹，托盘再弹就重了。
+//!
 //! 「没有响应」：问出去的（握手、订阅、读配置）过了 [`rpc::SLOW`] 还没回报 [`Report::Slow`]，接着等，回了再报 [`Report::Up`]。连着、
 //! 托盘不问什么的时候不知道核心卡没卡住：不为这个定时去问。「出错了」的一种：握手被拒（本机令牌不对、协议版本谈不拢），报
 //! [`Report::Refused`] 带核心的原话。
 
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use miyu_client::places::DataRoot;
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -23,6 +27,7 @@ use serde_json::{Value, json};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
+use crate::alerts::Note;
 use crate::extras::{self, Entry, Packages};
 use crate::log;
 use crate::rpc::{self, Failure, Rpc};
@@ -47,6 +52,8 @@ pub enum Report {
     Packages(Vec<Entry>),
     /// 局域网开没开；`None` 是核心不认 `web.listen`（网页软件没装）。
     Lan(Option<bool>),
+    /// 弹一条系统通知。
+    Note(Note),
 }
 
 /// 叫那条连接马上再试一次（托盘自己起停了核心以后）。
@@ -168,25 +175,41 @@ async fn session(root: &DataRoot, report: &dyn Fn(Report), was: &mut Option<bool
     }
     said(was, true, "connected");
     report(Report::Up);
-    // AP-4 挂在这里：握手以后调 `notices.claim`（参数空，回 `{}`；核心 TR-1），说「后台通知由托盘来发」，核心按这条连接记、
-    // 断了就作废；再订会话状态和 `notices` 流，照它们发系统通知。
-    match streams(&mut rpc, report, &mut slow).await {
+    let claimed = match soft(
+        "notices.claim",
+        rpc.call("notices.claim", json!({}), &mut slow).await,
+    ) {
+        Ok(claimed) => claimed.is_some(),
+        Err(failure) => return Ended::Closed(failure.said().to_string()),
+    };
+    match streams(&mut rpc, report, &mut slow, claimed).await {
         Ok(never) => match never {},
         Err(failure) => Ended::Closed(failure.said().to_string()),
     }
 }
 
-/// 订 `packages`、`config` 两条流，照推送报软件包的入口、局域网开没开。只在断了时回来。
+/// 订 `packages`、`config` 两条流，照推送报软件包的入口、局域网开没开；认领了后台通知的（`claimed`）再订会话表和提醒，照它们报
+/// 系统通知。只在断了时回来。
 async fn streams<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
     rpc: &mut Rpc<R, W>,
     report: &dyn Fn(Report),
     slow: &mut dyn FnMut(bool),
+    claimed: bool,
 ) -> Result<std::convert::Infallible, Failure> {
     let mut packages = Packages::default();
     subscribe_packages(rpc, &mut packages, report, slow).await?;
     follow_config(rpc, report, slow).await?;
+    let mut notices = if claimed {
+        Some(notices::Follow::start(rpc, slow).await?)
+    } else {
+        log::line("background notices not claimed, the web pages keep showing them");
+        None
+    };
     loop {
-        let push = rpc.push().await?;
+        let push = next_push(rpc, &mut notices, report).await?;
+        if let Some(follow) = notices.as_mut() {
+            follow.push(rpc, &push, report, slow).await?;
+        }
         match push["method"].as_str().unwrap_or_default() {
             "package.changed" => {
                 let installed_or_removed = packages.change(&push["params"]);
@@ -205,6 +228,27 @@ async fn streams<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
                 _ => {}
             },
             _ => {}
+        }
+    }
+}
+
+/// 等下一条推来的；有在等标题的通知的，到点了先把它们照第一句发掉（等的时候丢下读了一半的那一行不丢字，见 `rpc`）。
+async fn next_push<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
+    rpc: &mut Rpc<R, W>,
+    notices: &mut Option<notices::Follow>,
+    report: &dyn Fn(Report),
+) -> Result<Value, Failure> {
+    loop {
+        let Some((follow, at)) = notices
+            .as_mut()
+            .and_then(|follow| follow.next_due().map(|at| (follow, at)))
+        else {
+            return rpc.push().await;
+        };
+        let wait = at.saturating_duration_since(Instant::now());
+        match tokio::time::timeout(wait, rpc.push()).await {
+            Ok(push) => return push,
+            Err(_) => follow.due(report),
         }
     }
 }
@@ -331,5 +375,6 @@ fn relevant(kind: &EventKind, paths: &[PathBuf], root: &Path) -> bool {
     ) && paths.iter().any(|path| path.starts_with(root))
 }
 
+mod notices;
 #[cfg(test)]
 mod tests;
