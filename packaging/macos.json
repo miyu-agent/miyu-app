@@ -16,6 +16,7 @@
     "macOS": {
       "signingIdentity": "-",
       "minimumSystemVersion": "12.0",
+      "infoPlist": "packaging/macos/Info.plist",
       "files": {
         "Resources/miyu": "dist/resources"
       }

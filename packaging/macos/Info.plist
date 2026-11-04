@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Miyu.app 的 Info.plist 里多写的几项（施工 AP-5，图纸 app.md「装在哪」）：Tauri 的打包工具照 macos.json 的 infoPlist 把这一份并进它
+  生成的那份（同名的这里的算）。
+  LSUIElement：只在菜单栏，不占程序坞、不出现在 ⌘Tab 里。托盘起来时另在运行时设成 Accessory（src/main.rs），这一项让系统打开它的
+  那一下就不出程序坞图标。
+-->
+<plist version="1.0">
+<dict>
+  <key>LSUIElement</key>
+  <true/>
+</dict>
+</plist>
