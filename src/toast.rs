@@ -46,6 +46,13 @@ struct Shared {
         expect(dead_code, reason = "Windows 的图标照开始菜单快捷方式的，不用另写")
     )]
     icon: Option<PathBuf>,
+    #[cfg_attr(
+        windows,
+        expect(
+            dead_code,
+            reason = "Windows 上点了通知照 miyu-app: 网址拉起托盘，不回调"
+        )
+    )]
     on_click: OnClick,
     #[cfg(not(windows))]
     shown: Mutex<Shown>,
@@ -79,25 +86,20 @@ impl Toaster {
     }
 }
 
-/// Windows：自己拼 toast（`winrt`），点了（正文、按钮）照回调打开那个会话。
+/// Windows：自己拼 toast（`winrt`），点了照 `miyu-app:` 网址拉起托盘、打开那个会话（`protocol`），不用回调。
 #[cfg(windows)]
 fn show_now(shared: &Shared, note: &Note) {
     let body = shared.text.get(note.why.key());
-    match winrt::show(
+    let link = crate::protocol::link(note.session.as_deref());
+    if let Err(error) = winrt::show(
         APP_ID,
         &note.title,
         body,
         shared.text.get(key::NOTIFY_OPEN),
+        &link,
         &note.tag,
     ) {
-        Ok(winrt::Outcome::Clicked) => {
-            log::line(&format!("notification {} clicked", note.tag));
-            (shared.on_click)(note.session.clone());
-        }
-        Ok(winrt::Outcome::Closed) => {}
-        Err(error) => {
-            log::now_and_then("notification", &format!("notification not shown: {error}"))
-        }
+        log::now_and_then("notification", &format!("notification not shown: {error}"));
     }
 }
 

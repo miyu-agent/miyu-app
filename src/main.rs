@@ -16,6 +16,7 @@ mod lan;
 mod link;
 mod log;
 mod program;
+mod protocol;
 mod quit;
 mod reason;
 mod rpc;
@@ -38,9 +39,20 @@ use crate::text::Text;
 fn main() {
     let text = Arc::new(Text::system());
     let autostarted = std::env::args().skip(1).any(|arg| arg == autostart::ARG);
+    // 点了通知拉起来的（`--open miyu-app://open/?session=<编号>`，`protocol`）：要打开的那个会话
+    let opened = protocol::from_args(std::env::args().skip(1));
     let mut problem = None;
-    let root = match DataRoot::locate(&Env::current()) {
-        Ok(root) => Some(root),
+    // 照网址拉起来的带着登记时的数据根（`--home`，`protocol`）：照它找，不照环境变量
+    let mut env = Env::current();
+    if let Some(home) = protocol::home_from_args(std::env::args().skip(1)) {
+        env.miyu_home = Some(home.into_os_string());
+    }
+    let root = match DataRoot::locate(&env) {
+        Ok(root) => {
+            // 拉起的 `miyu` 都照这个数据根（`program::command` 带上 `MIYU_HOME`）
+            program::pin_home(root.path());
+            Some(root)
+        }
         Err(error) => {
             log::line(&format!("no data root: {error}"));
             problem = Some(error.to_string());
@@ -69,10 +81,16 @@ fn main() {
         Some((dir, Ok(Claim::Second))) => {
             if autostarted {
                 log::line("already running, autostart does nothing");
-            } else if let Err(error) = instance::ask(dir, &key) {
+            } else if let Err(error) = instance::ask(dir, &key, opened.clone().flatten().as_deref())
+            {
                 log::line(&format!("could not ask the running tray to open: {error}"));
             } else {
-                log::line("already running, asked it to open the web interface");
+                match opened.as_ref().and_then(Option::as_deref) {
+                    Some(id) => {
+                        log::line(&format!("already running, asked it to open session {id}"))
+                    }
+                    None => log::line("already running, asked it to open the web interface"),
+                }
             }
             return;
         }
@@ -111,7 +129,7 @@ fn main() {
 
     let _listening = own.as_deref().and_then(|dir| {
         let asked = post.clone();
-        instance::listen(dir, &key, move || asked.send(Event::Open))
+        instance::listen(dir, &key, move |session| asked.send(Event::Open(session)))
             .inspect_err(|error| log::line(&format!("not listening for a second start: {error}")))
             .ok()
     });
@@ -135,14 +153,27 @@ fn main() {
     let toaster = toast::Toaster::new(Arc::clone(&text), own.as_deref(), move |session| {
         clicked.send(Event::Clicked(session));
     });
-    let mut app = App::new(ctx, toaster, !autostarted, problem);
+    // 起来时开什么：点了通知拉起来的开那个会话，开机时起的不开，别的开首页
+    let open_at_start = match opened {
+        Some(session) => Some(session.map_or(actions::Page::Home, actions::Page::Session)),
+        None if autostarted => None,
+        None => Some(actions::Page::Home),
+    };
+    // Windows：点通知照 `miyu-app:` 网址拉起自己，每次起来照现在的位置登记一遍（`protocol`）
+    #[cfg(windows)]
+    if let (Some(exe), Some(root)) = (std::env::current_exe().ok(), ctx.root.as_ref())
+        && let Err(error) = protocol::register(&exe, root.path())
+    {
+        log::line(&format!("could not register the miyu-app: links: {error}"));
+    }
+    let mut app = App::new(ctx, toaster, open_at_start, problem);
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
         match event {
             LoopEvent::NewEvents(StartCause::Init) => app.started(),
             LoopEvent::UserEvent(event) => app.handle(event, control_flow),
             #[cfg(target_os = "macos")]
-            LoopEvent::Reopen { .. } => app.handle(Event::Open, control_flow),
+            LoopEvent::Reopen { .. } => app.handle(Event::Open(None), control_flow),
             _ => {}
         }
     });

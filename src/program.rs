@@ -90,12 +90,32 @@ pub enum RunError {
     Timeout,
 }
 
+/// 托盘用的数据根（起来时定下，[`pin_home`]）：拉起的 `miyu` 都照它，带上 `MIYU_HOME`。点了通知照 `miyu-app:` 网址拉起的托盘，
+/// 数据根是登记时写进去的（`protocol`），环境变量里没有，子进程不带上就会去默认的那一个。
+static HOME: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// 定下托盘用的数据根（只定一次）。
+pub fn pin_home(root: &Path) {
+    if HOME.set(root.to_path_buf()).is_err() {
+        // 定过了：照第一次的。
+    }
+}
+
+/// 调 `program` 的命令：带上托盘的数据根（[`pin_home`]）。
+pub fn command(program: &Path) -> Command {
+    let mut command = Command::new(program);
+    if let Some(home) = HOME.get() {
+        command.env("MIYU_HOME", home);
+    }
+    command
+}
+
 /// 调 `program args`，最多等 `limit`；标准输入是空的，标准输出、标准错误收下来。Windows 上不开控制台窗口。
 ///
 /// # Errors
 /// 起不来、等不了、超时。
 pub fn run(program: &Path, args: &[&str], limit: Duration) -> Result<Ran, RunError> {
-    let mut command = Command::new(program);
+    let mut command = command(program);
     command
         .args(args)
         .stdin(Stdio::null())
