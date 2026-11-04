@@ -34,11 +34,28 @@ fn the_second_claim_on_the_same_root_is_second() {
 fn asking_writes_something_new_each_time() {
     let dir = scratch("ask");
     std::fs::create_dir_all(&dir).unwrap();
-    ask(&dir, "k").unwrap();
+    ask(&dir, "k", None).unwrap();
     let first = std::fs::read_to_string(request(&dir, "k")).unwrap();
     std::thread::sleep(Duration::from_millis(2));
-    ask(&dir, "k").unwrap();
+    ask(&dir, "k", None).unwrap();
     assert_ne!(first, std::fs::read_to_string(request(&dir, "k")).unwrap());
+    assert_eq!(wanted_session(&first), None, "打开网页界面");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn a_click_on_a_notification_asks_for_its_session() {
+    let dir = scratch("ask-session");
+    std::fs::create_dir_all(&dir).unwrap();
+    let id = "01a1a520-30b6-702a-ada5-603e4d8a21e8";
+    ask(&dir, "k", Some(id)).unwrap();
+    let line = std::fs::read_to_string(request(&dir, "k")).unwrap();
+    assert_eq!(wanted_session(&line), Some(id.to_owned()));
+    assert_eq!(
+        wanted_session("session ../x 1"),
+        None,
+        "编号写法不对的照打开网页界面"
+    );
     std::fs::remove_dir_all(&dir).unwrap();
 }
 

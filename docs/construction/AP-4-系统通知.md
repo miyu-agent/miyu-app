@@ -112,3 +112,15 @@
 - **点横幅本身**：横幅收掉，托盘收不到（日志里没有 clicked）。**收进通知中心以后再点**：同样收不到。库（tauri-winrt-notification 0.8.1）的 toast 没有 `launch`，正文点了 Windows 不交回 `Activated`，只有带 `arguments` 的按钮交回；要点正文也打开，得自己拼带 `launch` 的 toast（WinRT 的接口在 windows 那个 crate 里是安全的 Rust，不用 `unsafe`），排成后续。
 - 同一个会话的几条在通知中心里摞在一起（「+2 个通知」），不换掉上一条，同上面「风险」里写的。
 - 没测：「等你确认」「等你回答」、网页开着那个会话时只有网页弹、退出托盘以后网页照原来弹。
+
+### 补：Windows 上点通知正文、通知中心里点（2026-11-04）
+
+上面那一节测出只有「打开」按钮回得来。先改成自己拼 toast、正文带 `launch`、进程里接 `Activated`：横幅上点正文回来了，通知中心里点还是不回来（到点收进通知中心时 `Dismissed(TimedOut)`，接着等也没用：Windows 只把通知中心里的点交给登记过的 COM 激活器）。最后改成照网址激活（`src/protocol.rs`、`src/toast/winrt.rs`，图纸第 5 条 Windows 那一款）。
+
+Windows 虚拟机上手测（本机 mingw 编的 `miyu-app.exe` 换进装好的 MSI 里，开始菜单快捷方式、应用身份照旧）：
+- 登记：`HKCU\Software\Classes\miyu-app\shell\open\command` 是 `"C:\Program Files\Miyu\miyu-app.exe" --home "C:\mt\tray-home" --open "%1"`。
+- 横幅上点正文：拉起的那一个日志 `already running, asked it …`，在跑的托盘 `miyu web --session <会话>`，浏览器到那个会话。
+- 收进通知中心以后点：同上。
+- 托盘退了以后在通知中心里点：拉起新的托盘，起来就 `miyu web --session <会话>`，浏览器到那个会话。
+- 同一个会话又答完一次：通知中心里那个会话只剩新的一条（14:14 那一条被 14:15 换掉）。
+- 坑：数据根照 `MIYU_HOME` 另指的，照网址拉起的程序拿不到这个环境变量（去了默认的数据根、报「旧版数据根」）；改成登记时把数据根写进命令（`--home`）以后好了。

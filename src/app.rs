@@ -31,8 +31,8 @@ pub enum Event {
     Done(Busy, bool),
     /// 出错了：拉不起核心、打不开网页界面，带 `miyu` 说的那一句。状态行断着的时候写「出错了」和它。
     Failed(String),
-    /// 有人要打开网页界面：第二个起来的托盘、macOS 上点了程序坞或者再开一次。
-    Open,
+    /// 有人要打开网页界面：第二个起来的托盘、macOS 上点了程序坞或者再开一次；带着会话的（Windows 上点了通知，`protocol`）打开那个会话。
+    Open(Option<String>),
     /// 点了系统通知：打开那个会话；账号级的提醒（没有会话的）打开网页界面。
     Clicked(Option<String>),
     /// 「退出 Miyu」停完了，现在退。
@@ -65,8 +65,8 @@ pub struct App {
     tray: Option<Tray>,
     /// 弹系统通知的（施工 AP-4）。
     toaster: Toaster,
-    /// 起来时开不开浏览器：开机拉起来的不开。
-    open_at_start: bool,
+    /// 起来时开什么：开机拉起来的不开（`None`），点了通知拉起来的开那个会话（`protocol`），别的开首页。
+    open_at_start: Option<Page>,
     /// 在退了：别的事不再接。
     quitting: bool,
     asked: Once,
@@ -74,7 +74,12 @@ pub struct App {
 
 impl App {
     /// `problem` 是起来时就知道的错（找不到数据根、找不到主程序），状态行照它写「出错了」。
-    pub fn new(ctx: Ctx, toaster: Toaster, open_at_start: bool, problem: Option<String>) -> Self {
+    pub fn new(
+        ctx: Ctx,
+        toaster: Toaster,
+        open_at_start: Option<Page>,
+        problem: Option<String>,
+    ) -> Self {
         let mut status = Status::default();
         if let Some(problem) = problem {
             status.fail(problem);
@@ -98,8 +103,8 @@ impl App {
             Ok(tray) => self.tray = Some(tray),
             Err(error) => log::line(&format!("no tray icon: {error}")),
         }
-        if self.open_at_start {
-            actions::open_web(&self.ctx, Page::Home);
+        if let Some(page) = self.open_at_start.take() {
+            actions::open_web(&self.ctx, page);
         }
     }
 
@@ -122,9 +127,9 @@ impl App {
                 self.status.fail(reason);
                 self.redraw();
             }
-            Event::Open => {
+            Event::Open(session) => {
                 if self.asked.allow(Instant::now()) {
-                    actions::open_web(&self.ctx, Page::Home);
+                    actions::open_web(&self.ctx, session.map_or(Page::Home, Page::Session));
                 }
             }
             Event::Clicked(session) => {

@@ -81,7 +81,10 @@
    - 点了：会话的 `miyu web --session <编号>`（网页 W-1085），账号级的 `miyu web`；旧网页不认参数（退出码 2）的退回 `miyu web`。通知上另有一个「打开」按钮，做的一样（macOS 要有按钮库才等人点）。
    - 用 `notify-rust` 4.18.2（钉死版本），三个平台做得到的不一样：
      - Linux：会话 D-Bus 的 `org.freedesktop.Notifications`（zbus，同 ksni 那一套），带 `desktop-entry: miyu-app`；同一个 `tag` 的带上一条的编号发（`replaces_id`）换掉它；点了是通知服务发回的 `ActionInvoked`（默认动作 `default`）。没有通知服务的桌面不弹，只记日志。
-     - Windows：WinRT 的 toast，照应用身份（AUMID）`io.github.miyu-agent.miyu-app` 发，就是 MSI 开始菜单快捷方式上的 `System.AppUserModel.ID`（Tauri 打包工具 2.10.4 的模板自带，值是 `tauri.conf.json` 的 `identifier`）；系统照这个快捷方式写「Miyu」、画图标，没装（直接跑编出来的程序）的不一定弹得出来。点了是 toast 的 `Activated`，托盘在跑时回得来；进了通知中心以后再点，没有注册 COM 激活器，回不回得来要手测（不回来的话：系统把通知中心里的点当成打开应用，不知道是哪个会话）。不换掉上一条：库只在进度条的 toast 上设 `Tag`。
+     - Windows：WinRT 的 toast，照应用身份（AUMID）`io.github.miyu-agent.miyu-app` 发，就是 MSI 开始菜单快捷方式上的 `System.AppUserModel.ID`（Tauri 打包工具 2.10.4 的模板自带，值是 `tauri.conf.json` 的 `identifier`）；系统照这个快捷方式写「Miyu」、画图标，没装（直接跑编出来的程序）的不一定弹得出来。toast 自己拼（`src/toast/winrt.rs`，`windows` 这个 crate 的 WinRT 接口，安全的 Rust），点了照网址拉起托盘（`src/protocol.rs`）。2026-11-04 Windows 虚拟机上测出：notify-rust 底下 tauri-winrt-notification 拼的 toast 只有「打开」按钮在横幅上时回得来，点正文、收进通知中心以后再点都回不来；改成在进程里接 `Activated` 也只管横幅，通知中心里点 Windows 只交给登记过的 COM 激活器（要 `unsafe`，不做）。现在：
+       - 正文、「打开」按钮都是 `activationType="protocol"`，网址 `miyu-app://open/?session=<编号>`（账号级的 `miyu-app://open/`）。托盘每次起来在当前用户的注册表登记 `miyu-app` 协议（`HKCU\Software\Classes\miyu-app`，不要管理员），命令是 `"<exe>" --home "<数据根>" --open "%1"`：照网址拉起的程序不带托盘的环境变量（`MIYU_HOME` 另指的数据根会丢），数据根写进命令里，起来照它找、`miyu` 子进程都带上 `MIYU_HOME`。
+       - 拉起来的那一个照单实例：有托盘在跑的交「打开那个会话」（`session <编号>`），自己退；没在跑的起来就打开那个会话。横幅上、通知中心里、托盘退了以后点都一样。
+       - 同一个 `tag` 的放进同一组（`Tag` 截到 64 个字、`Group` 是 `miyu`），下一条换掉上一条。卸载不删协议那一项（同「开机时启动」的注册表项）。
      - macOS：NSUserNotificationCenter（系统已经标成过时，还能用；新的 UNUserNotificationCenter 要签过名的 `.app`），照 `Miyu.app` 的 bundle id（同上）发，没装成 `.app` 的照库的默认用访达的身份。点了要等：带「打开」按钮的才等人点，点了通知本身或者按钮都打开那个会话；横幅收起以后在通知中心里再点，回不回得来要手测。不换掉上一条。
 6. **日志**：数据根 `var/log/` 下 `miyu-app.log`，和核心、网页的放在一起，照原来外壳 DT-10 的轮转和限流。数据根的 `var/log/` 由核心建：起来时还没有的先写到标准错误上，连上核心以后再定下文件（AP-2）。
 

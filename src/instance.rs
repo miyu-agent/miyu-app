@@ -1,4 +1,5 @@
-//! 单实例（图纸 `app.md` 第 1 条）：一个数据根只跑一个托盘。第二个起来的把「打开网页界面」交给已有的那一个，自己退。
+//! 单实例（图纸 `app.md` 第 1 条）：一个数据根只跑一个托盘。第二个起来的把「打开网页界面」交给已有的那一个，自己退；点通知拉起来的
+//! （`miyu-app --open miyu-app://open/?session=<编号>`，[`crate::protocol`]）交「打开那个会话」。
 //!
 //! 托盘自己的目录（只给自己看，见 [`crate::folder`]）里一把锁、一个「请打开」的文件：拿到锁的是第一个，它盯着那个文件；拿不到的
 //! 往文件里写一行就退。锁是系统的文件锁，进程没了系统就放，崩了不留死锁。不用本机套接字：Linux 的抽象套接字谁都连得上、谁都能抢先
@@ -55,31 +56,47 @@ fn request(dir: &Path, key: &str) -> PathBuf {
     dir.join(format!("{key}.open"))
 }
 
-/// 第二个起来的：叫第一个打开网页界面。每次写的不一样（带时间），文件本来就有的也照样算改了。
+/// 第二个起来的：叫第一个打开网页界面，`session` 有的打开那个会话。每次写的不一样（带时间），文件本来就有的也照样算改了。
 ///
 /// # Errors
 /// 写不进去。
-pub fn ask(dir: &Path, key: &str) -> io::Result<()> {
+pub fn ask(dir: &Path, key: &str, session: Option<&str>) -> io::Result<()> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default();
-    std::fs::write(request(dir, key), format!("open {}\n", now.as_nanos()))
+    let line = match session {
+        Some(id) => format!("session {id} {}\n", now.as_nanos()),
+        None => format!("open {}\n", now.as_nanos()),
+    };
+    std::fs::write(request(dir, key), line)
 }
 
-/// 第一个：盯着「请打开」的文件，有人写了就叫 `asked`。交回的盯着的东西要一直拿着。
+/// 读「请打开」那一行：`session <编号> …` 的交回那个会话，别的（`open …`、读不了的）是打开网页界面。
+fn wanted_session(line: &str) -> Option<String> {
+    let mut words = line.split_whitespace();
+    match (words.next(), words.next()) {
+        (Some("session"), Some(id)) => {
+            crate::protocol::parse(&crate::protocol::link(Some(id))).flatten()
+        }
+        _ => None,
+    }
+}
+
+/// 第一个：盯着「请打开」的文件，有人写了就叫 `asked`（带上要打开的会话，没有的是打开网页界面）。交回的盯着的东西要一直拿着。
 ///
 /// # Errors
 /// 盯不了。
 pub fn listen(
     dir: &Path,
     key: &str,
-    asked: impl Fn() + Send + 'static,
+    asked: impl Fn(Option<String>) + Send + 'static,
 ) -> notify::Result<RecommendedWatcher> {
     let wanted = request(dir, key);
     let mut watcher =
         notify::recommended_watcher(move |event: notify::Result<notify::Event>| match event {
             Ok(event) if written(&event.kind) && event.paths.contains(&wanted) => {
-                asked();
+                let line = std::fs::read_to_string(&wanted).unwrap_or_default();
+                asked(wanted_session(&line));
             }
             Ok(_) => {}
             Err(error) => {

@@ -24,11 +24,11 @@
 
 1. **许可证门禁**（原 DT-7）：`xtask/` 照网页仓库的 `xtask/src/licenses.rs`、`notices.rs` 搬（那一份照 miyu-im 的，miyu-im 的照核心的；网页这一份最新、最像：它也照 git 钉核心的 crate）。根上 `Cargo.toml` 加 `[workspace]`（成员 `xtask`），`.cargo/config.toml` 设 `cargo xtask` 别名。xtask 自己抄一份同样的 lints，不改根上的 `[lints]`（免得和别的分支在同一处撞）。
    - `cargo xtask licenses`：四个平台（`x86_64-unknown-linux-gnu`、`aarch64-unknown-linux-gnu`、`aarch64-apple-darwin`、`x86_64-pc-windows-msvc`，核心设计 12 R11；托盘的包现在只出三种，多查一个不碍事）各跑一次 `cargo metadata --filter-platform`，依赖图里的第三方包（构建、开发依赖也算）许可证照 SPDX 表达式算，要能和 AGPL-3.0-or-later 合在一起发。名单同核心蓝图 `licenses.md` 第 3 条加 GPL-3.0-or-later、AGPL-3.0-or-later，四个仓库一样。git 钉的核心 crate（`miyu-client` 和它带进来的 13 个）是 AGPL-3.0-or-later，放行。
-   - 2026-11-04 的依赖（四个平台合起来 324 个第三方包，加构建依赖以后 327 个）实际用到的：MIT、Apache-2.0（含 `WITH LLVM-exception`）、Unicode-3.0、Unlicense（`ksni` 只写了这一种，`memchr`、`jiff` 这些是 `Unlicense OR MIT`）、Zlib（`foldhash`、`zlib-rs`）、ISC（`inotify`）、BSD-3-Clause、BSD-2-Clause、0BSD（都在 `OR` 里）、CC0-1.0（`notify`）、AGPL-3.0-or-later（核心）。名单里另有 Unicode-DFS-2016、BSL-1.0、MPL-2.0、CDLA-Permissive-2.0、GPL-3.0-or-later 现在没用上，留着和别的仓库同一份。zbus 一套（`zbus`、`zvariant`、`zbus_names`）MIT，smol 一套（`async-io`、`async-executor`、`blocking`、`polling`）Apache-2.0 OR MIT，`windows` 一套 MIT OR Apache-2.0，`winreg` MIT，`notify-rust` MIT OR Apache-2.0。
+   - 2026-11-04 的依赖（四个平台合起来 324 个第三方包，加构建依赖以后 327 个，合进 AP-4 补以后 326 个）实际用到的：MIT、Apache-2.0（含 `WITH LLVM-exception`）、Unicode-3.0、Unlicense（`ksni` 只写了这一种，`memchr`、`jiff` 这些是 `Unlicense OR MIT`）、Zlib（`foldhash`、`zlib-rs`）、ISC（`inotify`）、BSD-3-Clause、BSD-2-Clause、0BSD（都在 `OR` 里）、CC0-1.0（`notify`）、AGPL-3.0-or-later（核心）。名单里另有 Unicode-DFS-2016、BSL-1.0、MPL-2.0、CDLA-Permissive-2.0、GPL-3.0-or-later 现在没用上，留着和别的仓库同一份。zbus 一套（`zbus`、`zvariant`、`zbus_names`）MIT，smol 一套（`async-io`、`async-executor`、`blocking`、`polling`）Apache-2.0 OR MIT，`windows` 一套 MIT OR Apache-2.0，`winreg` MIT，`notify-rust` MIT OR Apache-2.0。
 2. **第三方许可证清单**（原 DT-7）：`cargo xtask notices` 生成根上的 `THIRD-PARTY-LICENSES.txt`，提交进仓库；`cargo xtask licenses` 重算一遍，和仓库里的不一样就不过。
    - 照网页的做法：四个平台上从托盘顺着正常依赖走得到的包（构建依赖、开发依赖不编进程序，不算；门禁的小程序也在工作区里，不从它走；照 git 钉的核心 crate 照核心的 `LICENSE`，不算第三方），读各包带的许可证文件，没带的用 `xtask/src/notices/` 的标准原文；原文一样的合一段。
    - 和网页不一样的：编进去的第三方资源只有菜单的四个 Lucide 图标（`icons/source/lucide/LICENSE`，ISC，带 Feather 的 MIT）；应用图标、托盘图标是项目主人画的，不算。原来外壳 DT-7 的两处留着：MPL 的包段前那一行写 crates.io 的源码地址（MPL 第 3.2 条；现在依赖里没有 MPL 的包，AP-3 换 ksni 以后 `option-ext` 没了）、标准原文多一份 MPL-2.0；Windows 上检出成 CRLF 的标准原文换行统一。
-   - 2026-11-04 生成出来 179 段、约 520 KB。
+   - 2026-11-04 生成出来 171 段、约 520 KB；合进 AP-4 补以后 169 段（它自己的两份原文和别人都不一样，各一段）。
    - CI（`ci.yml`）：clippy、测试带 `--workspace`，行数也数 `xtask/src`、`build.rs`，Linux 上跑 `cargo xtask licenses`。
 3. **安装包带三份许可证**（原 DT-7）：`packaging/stage.py` 的 `stage_licenses` 放进资源目录的 `licenses/`，缺一份就停：
    - `miyu-app/`：这个仓库的 `LICENSE`、`THIRD-PARTY-LICENSES.txt`；
@@ -73,7 +73,7 @@
 
 - `drop-webkit.py` 自己解析 rpm 头：只认 rpm v4 不签名、Tauri 的 rpm 库（`rpm` 0.30）写出来的样子；认不出的就停，不出坏包。改完的包靠流水线里 `rpm -K`、`rpm -qpR` 验，本机没有 rpm 工具，只在上一次打包（41813382751）的 rpm 上试过：照原样重排对得上、签名头的摘要照新头算对、`bsdtar` 读得出 1043 个文件。
 - PowerShell 的 zip 每次打包从 GitHub 下，GitHub 抽风时打包失败，重跑就行。PowerShell 出新补丁不会自动跟，要人改 `pins.toml`。
-- 许可证清单跟着依赖变：升级、加依赖忘了跑 `cargo xtask notices`，CI 的许可证一步红，照提示跑一遍提交上来。分支 `step/AP-4-点通知正文` 把 `notify-rust` 改成只在非 Windows 上用、Windows 上另用 `windows`：后合的那一个要重新生成清单（`tauri-winrt-notification` 会从清单里出去）。
+- 许可证清单跟着依赖变：升级、加依赖忘了跑 `cargo xtask notices`，CI 的许可证一步红，照提示跑一遍提交上来。合进 main 的 AP-4 补（`7f717f3`）把 `notify-rust` 改成只在非 Windows 上用、Windows 上直接用 `windows` 0.62（依赖图里本来就有）：合进这个分支时重新生成了清单，`tauri-winrt-notification` 0.8.1 出去了（少两段），名单不用动。
 - Windows 交叉编（本机 `--target x86_64-pc-windows-gnu`）要有 `x86_64-w64-mingw32-windres`，没有的 build.rs 报错。
 
 ### 怎么验

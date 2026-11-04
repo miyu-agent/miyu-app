@@ -17,7 +17,6 @@
 //! | 退出 Miyu | 同「停止」，再退 |
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -293,7 +292,7 @@ pub(crate) fn start_core(miyu: &Path, root: &DataRoot) -> Result<(), String> {
     let miyu = miyu.to_path_buf();
     runtime
         .block_on(miyu_client::connect::connect_or_start(root, move || {
-            let mut command = Command::new(&miyu);
+            let mut command = program::command(&miyu);
             command.arg(program::CORE);
             command
         }))

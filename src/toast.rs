@@ -7,15 +7,19 @@
 //!   `tag` 的换掉上一条：记着每个 `tag` 上一条的编号，下一条带着它发（`replaces_id`）。点了是通知服务发回的 `ActionInvoked`
 //!   （默认动作 `default`）。
 //! - Windows：toast 照应用身份（AUMID）[`APP_ID`] 发，系统照开始菜单里带这个身份的快捷方式（Tauri 打包的 MSI 自带）写名字、画图标；
-//!   没装（直接跑编出来的程序）的不一定弹得出。点了是 toast 的 `Activated`，只在托盘还在跑时回得来。不换掉上一条（库只在进度条的
-//!   toast 上设 `Tag`）。
+//!   没装（直接跑编出来的程序）的不一定弹得出。不走 notify-rust，自己拼（`winrt`，AP-4 补：库拼的没有 `launch`，点正文、通知中心里点
+//!   都回不来）：正文和「打开」按钮点了都交回 `Activated`，同一个 `tag` 的换掉上一条。只在托盘还在跑时回得来。
 //! - macOS：照 [`APP_ID`] 认装好的 `Miyu.app`，图标照它；找不到的照库的默认（访达）。点了要等：带一个「打开」按钮，库才等人点。
 //!   不换掉上一条。
 
+#[cfg(not(windows))]
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::Arc;
+#[cfg(not(windows))]
+use std::sync::{Mutex, PoisonError};
 
+#[cfg(not(windows))]
 use notify_rust::{Notification, NotificationResponse};
 
 use crate::alerts::Note;
@@ -37,8 +41,20 @@ pub struct Toaster(Arc<Shared>);
 struct Shared {
     text: Arc<Text>,
     /// 通知的图标（Linux）。
+    #[cfg_attr(
+        windows,
+        expect(dead_code, reason = "Windows 的图标照开始菜单快捷方式的，不用另写")
+    )]
     icon: Option<PathBuf>,
+    #[cfg_attr(
+        windows,
+        expect(
+            dead_code,
+            reason = "Windows 上点了通知照 miyu-app: 网址拉起托盘，不回调"
+        )
+    )]
     on_click: OnClick,
+    #[cfg(not(windows))]
     shown: Mutex<Shown>,
 }
 
@@ -53,6 +69,7 @@ impl Toaster {
             text,
             icon: platform::prepare(own),
             on_click: Box::new(on_click),
+            #[cfg(not(windows))]
             shown: Mutex::new(Shown::default()),
         }))
     }
@@ -69,6 +86,24 @@ impl Toaster {
     }
 }
 
+/// Windows：自己拼 toast（`winrt`），点了照 `miyu-app:` 网址拉起托盘、打开那个会话（`protocol`），不用回调。
+#[cfg(windows)]
+fn show_now(shared: &Shared, note: &Note) {
+    let body = shared.text.get(note.why.key());
+    let link = crate::protocol::link(note.session.as_deref());
+    if let Err(error) = winrt::show(
+        APP_ID,
+        &note.title,
+        body,
+        shared.text.get(key::NOTIFY_OPEN),
+        &link,
+        &note.tag,
+    ) {
+        log::now_and_then("notification", &format!("notification not shown: {error}"));
+    }
+}
+
+#[cfg(not(windows))]
 fn show_now(shared: &Shared, note: &Note) {
     let mut notification = Notification::new();
     notification
@@ -109,12 +144,14 @@ fn show_now(shared: &Shared, note: &Note) {
     }
 }
 
+#[cfg(not(windows))]
 impl Shared {
     fn shown(&self) -> std::sync::MutexGuard<'_, Shown> {
         self.shown.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
 
+#[cfg(not(windows))]
 /// 发出去还没关的那几条（只有给编号的平台有）：每个 `tag` 上一条的编号；每个编号最新一次是第几次发的。换掉一条以后等旧那一次的
 /// 线程还在等同一个编号，点了两个线程都收得到，只有最新的那一次算数。
 #[derive(Debug, Default)]
@@ -124,6 +161,7 @@ struct Shown {
     sends: u64,
 }
 
+#[cfg(not(windows))]
 impl Shown {
     /// 这个 `tag` 上一条还开着的编号。
     fn replaces(&self, tag: &str) -> Option<u32> {
@@ -194,25 +232,18 @@ mod platform {
     }
 }
 
-/// Windows：照应用身份发。
+/// Windows：图标照开始菜单快捷方式的，不用另写；通知自己拼（[`winrt`]）。
 #[cfg(windows)]
 mod platform {
     use std::path::{Path, PathBuf};
 
-    use notify_rust::{Notification, NotificationHandle};
-
     pub fn prepare(_: Option<&Path>) -> Option<PathBuf> {
         None
     }
-
-    pub fn dress(notification: &mut Notification, _: Option<&Path>, _: Option<u32>) {
-        notification.app_id(super::APP_ID);
-    }
-
-    pub fn id_of(_: &NotificationHandle) -> Option<u32> {
-        None
-    }
 }
+
+#[cfg(windows)]
+mod winrt;
 
 /// macOS：起来时认一次 `Miyu.app`。
 #[cfg(target_os = "macos")]
@@ -237,5 +268,5 @@ mod platform {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(windows)))]
 mod tests;
