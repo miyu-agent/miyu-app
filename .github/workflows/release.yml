@@ -129,7 +129,8 @@ jobs:
           for want in gtk3 bubblewrap; do grep -qx "$want" rpm-requires.txt || { echo "rpm 少了 $want"; exit 1; }; done
           # 改过的 rpm 头的摘要对得上（没签名，只查摘要）
           rpm -K --nosignature "$rpm"
-          dpkg-deb -c "$deb" | awk '{print $NF}' | sed 's|^\./|/|' > deb-files.txt
+          # deb 里的路径写成 usr/…（Tauri 的打包工具不带 ./），也可能带 ./：都换成 /usr/…
+          dpkg-deb -c "$deb" | awk '{print $NF}' | sed 's|^\./||; s|^|/|' > deb-files.txt
           rpm -qpl "$rpm" > rpm-files.txt
           for f in licenses/README.txt licenses/miyu-app/LICENSE licenses/miyu-app/THIRD-PARTY-LICENSES.txt \
                    licenses/miyu/LICENSE licenses/miyu/THIRD-PARTY-LICENSES.txt licenses/miyu/LICENSES/Apache-2.0.txt \
