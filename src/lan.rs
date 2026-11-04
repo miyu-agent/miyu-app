@@ -60,7 +60,7 @@ async fn change(root: &DataRoot, on: bool) -> Result<Outcome, Failed> {
     // 这里慢不慢不用报：外面整个限了时。
     let mut slow = |_: bool| {};
     let said = |failure: rpc::Failure| Failed::Said(failure.said().to_string());
-    let hello = rpc::hello(&token, &miyu_client::open::locale());
+    let hello = rpc::hello(&token, &crate::text::system_locale());
     let shaken = rpc.call("hello", hello, &mut slow).await.map_err(said)?;
     if on && !password_set(&shaken) {
         return Ok(Outcome::NeedsPassword);

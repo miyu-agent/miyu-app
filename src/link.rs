@@ -160,7 +160,7 @@ async fn session(root: &DataRoot, report: &dyn Fn(Report), was: &mut Option<bool
     let (read, write) = tokio::io::split(connection);
     let mut rpc = Rpc::new(read, write);
     let mut slow = |late: bool| report(if late { Report::Slow } else { Report::Up });
-    let hello = rpc::hello(&token, &miyu_client::open::locale());
+    let hello = rpc::hello(&token, &crate::text::system_locale());
     match rpc.call("hello", hello, &mut slow).await {
         Ok(_) => {}
         Err(Failure::Refused { message, .. }) => return Ended::Refused(message),

@@ -102,6 +102,15 @@ impl Lang {
     }
 }
 
+/// 这台电脑的语言（`zh-CN` 这种写法）：托盘菜单的字照它挑，连核心握手的 `locale` 也交它，软件包托盘入口的名字照连接的语言给，两边一样
+/// （2026-11-04 Windows 虚拟机上测出：握手原来交 `miyu_client::open::locale()`，那个只读 `LC_ALL`、`LANG` 这些环境变量，Windows 上没有，
+/// 核心照英文给了「Open tray test」，菜单别的字是中文）。系统给不出的照环境变量，都没有的是空的。
+pub fn system_locale() -> String {
+    sys_locale::get_locale()
+        .filter(|locale| !locale.is_empty())
+        .unwrap_or_else(miyu_client::open::locale)
+}
+
 /// 一份字：键到这种语言的一句。
 #[derive(Debug)]
 pub struct Text {
@@ -111,9 +120,7 @@ pub struct Text {
 impl Text {
     /// 照这个进程的系统语言挑一份。
     pub fn system() -> Self {
-        Self::of(Lang::of_locale(
-            &sys_locale::get_locale().unwrap_or_default(),
-        ))
+        Self::of(Lang::of_locale(&system_locale()))
     }
 
     /// 这种语言的那一份。读不出来的（不会：测试查过三份）记一行日志，每个键照键名给。
