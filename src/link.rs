@@ -5,7 +5,10 @@
 //! 连法同核心门面的 `Core::connect_running`（`miyu-client` 的 `connect::connect` 加同一句 `hello`），只是自己拿着这条连接（[`Rpc`]）：
 //! `Core` 只能一问一答，等不了「断了」，也收不了推送。网页软件跟着配置的那条连接（网页 `follow.rs`）也是这样写的。
 //!
-//! 「没有响应」：问出去的（握手）过了 [`rpc::SLOW`] 还没回报 [`Report::Slow`]，接着等，回了再报 [`Report::Up`]。连着、
+//! 握手以后（施工 AP-3）在这条连接上订 `packages` 流，菜单照它画，不定时去问：回应是整份软件包列表，之后推 `package.changed`，算出
+//! 软件包挂的入口（[`Packages`]）；掉了队（`resync`）的重新订。
+//!
+//! 「没有响应」：问出去的（握手、订阅）过了 [`rpc::SLOW`] 还没回报 [`Report::Slow`]，接着等，回了再报 [`Report::Up`]。连着、
 //! 托盘不问什么的时候不知道核心卡没卡住：不为这个定时去问。「出错了」的一种：握手被拒（本机令牌不对、协议版本谈不拢），报
 //! [`Report::Refused`] 带核心的原话。
 
@@ -14,8 +17,11 @@ use std::time::Duration;
 
 use miyu_client::places::DataRoot;
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use serde_json::{Value, json};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
+use crate::extras::{Entry, Packages};
 use crate::log;
 use crate::rpc::{self, Failure, Rpc};
 
@@ -35,6 +41,8 @@ pub enum Report {
     Down,
     /// 连上了，握手被核心拒了：带核心的原话（照这台电脑的语言）。
     Refused(String),
+    /// 软件包挂的入口（整份，照编号排）。
+    Packages(Vec<Entry>),
 }
 
 /// 叫那条连接马上再试一次（托盘自己起停了核心以后）。
@@ -139,7 +147,7 @@ fn drain(receive: &mut UnboundedReceiver<()>) {
     while receive.try_recv().is_ok() {}
 }
 
-/// 连一次：握手，一直读到断。
+/// 连一次：握手，订流，照推送跟着，直到断。
 async fn session(root: &DataRoot, report: &dyn Fn(Report), was: &mut Option<bool>) -> Ended {
     let (connection, token) = match miyu_client::connect::connect(root).await {
         Ok(got) => got,
@@ -158,12 +166,62 @@ async fn session(root: &DataRoot, report: &dyn Fn(Report), was: &mut Option<bool
     report(Report::Up);
     // AP-4 挂在这里：握手以后调 `notices.claim`（参数空，回 `{}`；核心 TR-1），说「后台通知由托盘来发」，核心按这条连接记、
     // 断了就作废；再订会话状态和 `notices` 流，照它们发系统通知。
-    // 推来的不看（这一步不订推送）。
+    match streams(&mut rpc, report, &mut slow).await {
+        Ok(never) => match never {},
+        Err(failure) => Ended::Closed(failure.said().to_string()),
+    }
+}
+
+/// 订 `packages` 流，照推送报软件包的入口。只在断了时回来。
+async fn streams<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
+    rpc: &mut Rpc<R, W>,
+    report: &dyn Fn(Report),
+    slow: &mut dyn FnMut(bool),
+) -> Result<std::convert::Infallible, Failure> {
+    let mut packages = Packages::default();
+    subscribe_packages(rpc, &mut packages, report, slow).await?;
     loop {
-        if let Err(failure) = rpc.push().await {
-            return Ended::Closed(failure.said().to_string());
+        let push = rpc.push().await?;
+        match push["method"].as_str().unwrap_or_default() {
+            "package.changed" => {
+                packages.change(&push["params"]);
+                report(Report::Packages(packages.entries()));
+            }
+            "resync" if push["params"]["stream"] == json!("packages") => {
+                subscribe_packages(rpc, &mut packages, report, slow).await?;
+            }
+            _ => {}
         }
     }
+}
+
+/// 拒了的不算断：记一行，交 `None`（老核心不认），这条连接接着用。
+fn soft(method: &str, got: Result<Value, Failure>) -> Result<Option<Value>, Failure> {
+    match got {
+        Ok(value) => Ok(Some(value)),
+        Err(Failure::Refused { reason, message }) => {
+            log::line(&format!("{method} refused: {reason} {message}"));
+            Ok(None)
+        }
+        Err(closed) => Err(closed),
+    }
+}
+
+async fn subscribe_packages<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
+    rpc: &mut Rpc<R, W>,
+    packages: &mut Packages,
+    report: &dyn Fn(Report),
+    slow: &mut dyn FnMut(bool),
+) -> Result<(), Failure> {
+    let params = json!({"stream": "packages"});
+    if let Some(reply) = soft(
+        "subscribe packages",
+        rpc.call("subscribe", params, slow).await,
+    )? {
+        packages.replace(&reply);
+        report(Report::Packages(packages.entries()));
+    }
+    Ok(())
 }
 
 /// 盯着 `run/`：没有的盯着数据根，数据根也没有的盯着它的上一级（第一次装上、核心还没起过）。每连一次之前重新看该盯哪里。

@@ -7,12 +7,12 @@ use tao::event_loop::{ControlFlow, EventLoopProxy};
 use tray_icon::TrayIconEvent;
 use tray_icon::menu::MenuId;
 
-use crate::actions::{self, Ctx};
+use crate::actions::{self, Ctx, Page};
 use crate::instance::Once;
 use crate::link::Report;
 use crate::status::{self, Busy, Linked, Status};
 use crate::text::Text;
-use crate::tray::{self, Tray, id};
+use crate::tray::{self, Extras, Tray, id};
 use crate::{autostart, log};
 
 /// 交给界面线程的事。
@@ -57,6 +57,8 @@ pub struct App {
     ctx: Ctx,
     text: Arc<Text>,
     status: Status,
+    /// 照核心来的几行（软件包的入口）：变了把菜单整个换一份。
+    extras: Extras,
     tray: Option<Tray>,
     /// 起来时开不开浏览器：开机拉起来的不开。
     open_at_start: bool,
@@ -76,6 +78,7 @@ impl App {
             text: Arc::clone(&ctx.text),
             ctx,
             status,
+            extras: Extras::default(),
             tray: None,
             open_at_start,
             quitting: false,
@@ -85,12 +88,12 @@ impl App {
 
     /// 事件循环转起来了：建托盘（macOS 要在这以后建），要开浏览器的开一次。
     pub fn started(&mut self) {
-        match tray::create(&self.text, &self.look(), autostart::enabled()) {
+        match tray::create(&self.text, &self.look(), autostart::enabled(), &self.extras) {
             Ok(tray) => self.tray = Some(tray),
             Err(error) => log::line(&format!("no tray icon: {error}")),
         }
         if self.open_at_start {
-            actions::open_web(&self.ctx, false);
+            actions::open_web(&self.ctx, Page::Home);
         }
     }
 
@@ -115,7 +118,7 @@ impl App {
             }
             Event::Open => {
                 if self.asked.allow(Instant::now()) {
-                    actions::open_web(&self.ctx, false);
+                    actions::open_web(&self.ctx, Page::Home);
                 }
             }
         }
@@ -132,6 +135,13 @@ impl App {
             Report::Refused(why) => {
                 self.status.link(Linked::Down);
                 self.status.fail(why);
+            }
+            Report::Packages(packages) => {
+                if packages != self.extras.packages {
+                    self.extras.packages = packages;
+                    self.rebuild();
+                }
+                return;
             }
         }
         self.redraw();
@@ -155,8 +165,8 @@ impl App {
                 self.redraw();
             }
             id::TOGGLE | id::RESTART => log::line("busy, start/stop ignored"),
-            id::OPEN => actions::open_web(&self.ctx, false),
-            id::SETTINGS => actions::open_web(&self.ctx, true),
+            id::OPEN => actions::open_web(&self.ctx, Page::Home),
+            id::SETTINGS => actions::open_web(&self.ctx, Page::Settings),
             id::AUTOSTART => {
                 let on = actions::toggle_autostart(&self.ctx);
                 if let Some(tray) = &self.tray {
@@ -172,7 +182,10 @@ impl App {
                 self.tray = None;
                 actions::quit(&self.ctx);
             }
-            other => log::line(&format!("unknown menu item {other}")),
+            other => match other.strip_prefix(id::PACKAGE) {
+                Some(package) => actions::open_web(&self.ctx, Page::Package(package.to_owned())),
+                None => log::line(&format!("unknown menu item {other}")),
+            },
         }
     }
 
@@ -187,7 +200,7 @@ impl App {
             ..
         } = event
         {
-            actions::open_web(&self.ctx, false);
+            actions::open_web(&self.ctx, Page::Home);
         }
     }
 
@@ -198,6 +211,14 @@ impl App {
     fn redraw(&self) {
         if let Some(tray) = &self.tray {
             tray.show(&self.text, &self.look());
+        }
+    }
+
+    /// 照核心来的几行变了：菜单整个换一份。
+    fn rebuild(&mut self) {
+        let look = self.look();
+        if let Some(tray) = &mut self.tray {
+            tray.rebuild(&self.text, &look, &self.extras);
         }
     }
 }

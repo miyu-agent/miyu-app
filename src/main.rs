@@ -7,6 +7,7 @@ mod about;
 mod actions;
 mod app;
 mod autostart;
+mod extras;
 mod folder;
 mod icon;
 mod instance;

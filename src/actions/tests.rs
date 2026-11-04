@@ -42,3 +42,13 @@ fn success_says_nothing_and_failures_say_why() {
     });
     assert_eq!(failure(&killed, &text), Some(String::new()));
 }
+
+#[test]
+fn each_page_has_its_arguments() {
+    assert_eq!(Page::Home.args(), ["web"]);
+    assert_eq!(Page::Settings.args(), ["web", "--settings"]);
+    assert_eq!(
+        Page::Package("miyu-im".into()).args(),
+        ["web", "--package", "miyu-im"]
+    );
+}

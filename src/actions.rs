@@ -5,6 +5,7 @@
 //! |---|---|
 //! | 打开网页界面 | `miyu web` |
 //! | 设置… | `miyu web --settings`；旧网页不认这个参数（退出码 2）的，退回 `miyu web` |
+//! | 软件包挂的入口 | `miyu web --package <编号>`；退回同上 |
 //! | 停止 | `miyu web --stop`（网页 W-1091），再 `miyu core stop` |
 //! | 启动 | 照头的办法拉起核心：建好数据根的骨架，`connect_or_start` 拉起 `miyu core`（不开浏览器） |
 //! | 重新启动 | 先停核心再起（网页软件留着，页面接着连新的） |
@@ -51,22 +52,41 @@ fn background(name: &str, work: impl FnOnce() + Send + 'static) {
     }
 }
 
-/// 用浏览器打开网页界面；`settings` 的打开网页的设置。
-pub fn open_web(ctx: &Ctx, settings: bool) {
+/// 用浏览器打开网页的哪一处。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Page {
+    /// 首页（`miyu web`）。
+    Home,
+    /// 设置（`--settings`，网页 W-1085）。
+    Settings,
+    /// 一个软件包的后台页（`--package <编号>`，网页 F-6 下）。
+    Package(String),
+}
+
+impl Page {
+    /// 跟在 `miyu` 后面的参数。
+    pub fn args(&self) -> Vec<&str> {
+        match self {
+            Page::Home => program::WEB.to_vec(),
+            Page::Settings => program::SETTINGS.to_vec(),
+            Page::Package(package) => vec!["web", "--package", package],
+        }
+    }
+}
+
+/// 用浏览器打开网页界面的 `page` 那一处。没在跑的由 `miyu web` 拉起核心、网页软件。
+pub fn open_web(ctx: &Ctx, page: Page) {
     let ctx = ctx.clone();
     background("open-web", move || {
         let Some(miyu) = ctx.miyu.as_deref() else {
             tell(&ctx.text, key::NO_PROGRAM, "");
             return;
         };
-        let first = if settings {
-            program::SETTINGS
-        } else {
-            program::WEB
-        };
-        let mut got = run_logged(miyu, first, program::WEB_LIMIT);
-        if settings && not_understood(&got) {
-            log::line("the web app does not know --settings, opening the web interface instead");
+        let mut got = run_logged(miyu, &page.args(), program::WEB_LIMIT);
+        if page != Page::Home && not_understood(&got) {
+            log::line(&format!(
+                "the web app does not know {page:?}, opening the web interface instead"
+            ));
             got = run_logged(miyu, program::WEB, program::WEB_LIMIT);
         }
         if let Some(detail) = failure(&got, &ctx.text) {

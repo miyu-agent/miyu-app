@@ -3,7 +3,7 @@
 //! 1. 状态行（灰、不能点，前面一个小圆点）；
 //! 2. 「停止」或「启动」、「重新启动」（带图标；不能用时灰着，不藏）；
 //! 3. 「打开网页界面」（默认项）、「设置…」（macOS 带 ⌘,）；
-//! 4. （软件包挂的入口：等核心 TR-2，见 [`create`] 里留的位置）
+//! 4. 软件包挂的入口（核心 TR-2，施工 AP-3）：一个包一行，一个都没有的不出这一组；
 //! 5. （局域网：AP-3，同上）
 //! 6. 「开机时启动」（打勾）、「打开日志所在的文件夹」；
 //! 7. 「关于 Miyu」、「退出 Miyu」（带图标；macOS 带 ⌘Q）。
@@ -16,6 +16,7 @@ use tray_icon::menu::{
 };
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
+use crate::extras::Entry;
 use crate::icon::{self, MENU_SIZE};
 use crate::status::{Look, Toggle};
 use crate::text::{Text, key};
@@ -31,17 +32,31 @@ pub mod id {
     pub const LOGS: &str = "logs";
     pub const ABOUT: &str = "about";
     pub const QUIT: &str = "quit";
+    /// 软件包挂的入口：后面接包的编号。
+    pub const PACKAGE: &str = "package:";
 }
 
 /// 建好的托盘：跟着状态变的几行拿着，好改。
 pub struct Tray {
-    _icon: TrayIcon,
+    icon: TrayIcon,
+    items: Items,
+    stop_icon: Option<MenuIcon>,
+    start_icon: Option<MenuIcon>,
+}
+
+/// 菜单里跟着状态变的几行。菜单整个换掉（软件包的入口变了）时跟着换。
+struct Items {
     status: IconMenuItem,
     toggle: IconMenuItem,
     restart: IconMenuItem,
     autostart: CheckMenuItem,
-    stop_icon: Option<MenuIcon>,
-    start_icon: Option<MenuIcon>,
+}
+
+/// 照核心来的、变了要把菜单整个换掉的几行。
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Extras {
+    /// 软件包挂的入口。
+    pub packages: Vec<Entry>,
 }
 
 /// 解一张编进程序的菜单图标；解不出的（不会：测试查过）不带图标。
@@ -68,11 +83,8 @@ fn shortcut(_: &str) -> Option<tray_icon::menu::accelerator::Accelerator> {
     None
 }
 
-/// 建托盘图标和菜单，先照 `look` 画一遍。
-///
-/// # Errors
-/// 建不出（Linux 上连不上会话的 D-Bus）。
-pub fn create(text: &Text, look: &Look, autostart: bool) -> Result<Tray, String> {
+/// 照 `extras` 建一份菜单（还没画状态）。
+fn menu(text: &Text, autostart: bool, extras: &Extras) -> Result<(Menu, Items), String> {
     let status = IconMenuItem::with_id(id::STATUS, "", false, None, None);
     let toggle = IconMenuItem::with_id(id::TOGGLE, "", false, None, None);
     let restart = IconMenuItem::with_id(id::RESTART, text.get(key::RESTART), false, None, None);
@@ -101,32 +113,57 @@ pub fn create(text: &Text, look: &Look, autostart: bool) -> Result<Tray, String>
         shortcut("CmdOrCtrl+Q"),
     );
     put_icon(&quit, menu_icon(icon::QUIT));
+    // 软件包挂的入口：清单写了 `[tray]`、开着的包一个一行，字是核心照连接的语言挑好的，点了 `miyu web --package <编号>`。
+    let packages: Vec<MenuItem> = extras
+        .packages
+        .iter()
+        .map(|entry| {
+            let item_id = format!("{}{}", id::PACKAGE, entry.package);
+            MenuItem::with_id(item_id, &entry.name, true, None)
+        })
+        .collect();
 
     let menu = Menu::new();
     let separator = PredefinedMenuItem::separator;
-    let added = [
+    let mut added = vec![
         menu.append(&status),
         menu.append(&toggle),
         menu.append(&restart),
         menu.append(&separator()),
         menu.append(&open),
         menu.append(&settings),
-        // 软件包挂的入口（图纸第 4 条，AP-3 做；核心 TR-2）：清单写 `[tray] name = {zh, en}` 的包，`package.list` 和 packages
-        // 流里多一格 `"tray": {"name": …}`（照连接的语言挑好的）；照 enabled、status 只列开着的，一个包一行，点了跑
-        // `miyu web --package <编号>`。前面一根分隔线，一个都没有的不出这一组。
-        // 局域网（AP-3）：「局域网访问」打勾的开关，开着时多一行「在手机上打开…」（用浏览器打开网页设置里显示地址和二维码的
-        // 那一组），前面一根分隔线。
+    ];
+    if !packages.is_empty() {
+        added.push(menu.append(&separator()));
+        added.extend(packages.iter().map(|item| menu.append(item)));
+    }
+    // 局域网（AP-3）：「局域网访问」打勾的开关，开着时多一行「在手机上打开…」，前面一根分隔线。
+    added.extend([
         menu.append(&separator()),
         menu.append(&autostart_item),
         menu.append(&logs),
         menu.append(&separator()),
         menu.append(&about),
         menu.append(&quit),
-    ];
+    ]);
     if let Some(error) = added.into_iter().find_map(Result::err) {
         return Err(error.to_string());
     }
+    let items = Items {
+        status,
+        toggle,
+        restart,
+        autostart: autostart_item,
+    };
+    Ok((menu, items))
+}
 
+/// 建托盘图标和菜单，先照 `look` 画一遍。
+///
+/// # Errors
+/// 建不出（Linux 上连不上会话的 D-Bus）。
+pub fn create(text: &Text, look: &Look, autostart: bool, extras: &Extras) -> Result<Tray, String> {
+    let (menu, items) = menu(text, autostart, extras)?;
     let image = icon::decode(icon::TRAY)?;
     let tray_icon =
         Icon::from_rgba(image.pixels, image.width, image.height).map_err(|e| e.to_string())?;
@@ -144,11 +181,8 @@ pub fn create(text: &Text, look: &Look, autostart: bool) -> Result<Tray, String>
         .build()
         .map_err(|error| error.to_string())?;
     let tray = Tray {
-        _icon: built,
-        status,
-        toggle,
-        restart,
-        autostart: autostart_item,
+        icon: built,
+        items,
         stop_icon: menu_icon(icon::STOP),
         start_icon: menu_icon(icon::START),
     };
@@ -159,27 +193,42 @@ pub fn create(text: &Text, look: &Look, autostart: bool) -> Result<Tray, String>
 impl Tray {
     /// 照 `look` 改状态行和起停那两行。
     pub fn show(&self, text: &Text, look: &Look) {
-        let status = match &look.reason {
-            Some(reason) => format!("{}\n{reason}", text.get(look.status)),
-            None => text.get(look.status).to_owned(),
+        let items = &self.items;
+        let status = match look.reason.as_deref().map(str::trim) {
+            Some(reason) if !reason.is_empty() => format!("{}\n{reason}", text.get(look.status)),
+            _ => text.get(look.status).to_owned(),
         };
-        self.status.set_text(status);
+        items.status.set_text(status);
         let dot = icon::dot(look.dot.rgb(), MENU_SIZE);
         // 圆点带颜色，不当模板图。
-        self.status
+        items
+            .status
             .set_icon(MenuIcon::from_rgba(dot.pixels, dot.width, dot.height).ok());
         let (label, image) = match look.toggle {
             Toggle::Stop => (key::STOP, &self.stop_icon),
             Toggle::Start => (key::START, &self.start_icon),
         };
-        self.toggle.set_text(text.get(label));
-        put_icon(&self.toggle, image.clone());
-        self.toggle.set_enabled(look.toggle_enabled);
-        self.restart.set_enabled(look.restart_enabled);
+        items.toggle.set_text(text.get(label));
+        put_icon(&items.toggle, image.clone());
+        items.toggle.set_enabled(look.toggle_enabled);
+        items.restart.set_enabled(look.restart_enabled);
+    }
+
+    /// 照核心来的几行变了：整个菜单换一份，再照 `look` 画一遍。「开机时启动」照现在打的勾。
+    pub fn rebuild(&mut self, text: &Text, look: &Look, extras: &Extras) {
+        let autostart = self.items.autostart.is_checked();
+        match menu(text, autostart, extras) {
+            Ok((menu, items)) => {
+                self.icon.set_menu(Some(Box::new(menu)));
+                self.items = items;
+                self.show(text, look);
+            }
+            Err(error) => crate::log::line(&format!("menu not rebuilt: {error}")),
+        }
     }
 
     /// 「开机时启动」打不打勾。
     pub fn set_autostart(&self, on: bool) {
-        self.autostart.set_checked(on);
+        self.items.autostart.set_checked(on);
     }
 }
