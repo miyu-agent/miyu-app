@@ -12,3 +12,5 @@
 ### 许可证
 
 AGPL-3.0-or-later，见 [`LICENSE`](LICENSE)。菜单里的图标来自 [Lucide](https://lucide.dev)（ISC），见 [`icons/source/lucide/LICENSE`](icons/source/lucide/LICENSE)。
+
+编进托盘的第三方包和资源，许可证原文都在 [`THIRD-PARTY-LICENSES.txt`](THIRD-PARTY-LICENSES.txt)（`cargo xtask notices` 生成，CI 的 `cargo xtask licenses` 查依赖的许可证能不能和 AGPL 合在一起发、这份是不是最新的）。安装包里托盘、核心、网页各带一份，在资源目录的 `licenses/` 下。

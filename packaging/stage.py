@@ -2,10 +2,12 @@
 # 搭安装包的内容（施工 DT-6，图纸 app.md「装在哪」）：核心、网页软件编好以后，照 Tauri 打包工具要的样子放进 dist/。
 #   dist/binaries/<程序>-<目标三元组>[.exe]  Tauri 的 externalBin：装在托盘程序旁边，名字去掉三元组
 #   dist/resources/                         核心仓库的整份 resources/，加网页包的文件夹 packages/miyu-webui/
+#   dist/resources/licenses/                托盘、核心、网页三份许可证和第三方许可证清单（施工 AP-5，原来外壳的 DT-7）
 #   dist/pins.txt                           钉的两个提交号，写进发版说明
 # 网页包的文件夹照网页仓库 tools/pack-web.py 装好的样子（网页的会话 2026-10-30 定）：清单没写 version 的补上（照网页的工作区版本）；
 # 网页 W-1095（0.1.0）起清单自己写 version 和 targets 三种，照原样用，version 要和工作区版本一样，
-# web.json、matugen/ 原样，pages/ 是 web-demo 里给浏览器的七样，程序放 bin/。
+# web.json、matugen/ 原样，许可证（仓库根的 LICENSE、miyu-webui/ 的第三方许可证清单）放包的根上，pages/ 是 web-demo 里给浏览器的七样，
+# 程序放 bin/。等待页 loading.html 是给原来外壳的窗口用的，托盘不用，不带。
 #   python3 packaging/stage.py --core <核心检出> --web <网页检出> --triple <rustc 的 host> --out dist
 import argparse, pathlib, re, shutil, sys, tomllib
 
@@ -44,6 +46,39 @@ def copy_program(built, name, exe, dest):
     shutil.copy2(src, dest)
 
 
+LICENSES_README = """Licenses of the software in this Miyu package.
+
+miyu-app/   the tray app (miyu-app): LICENSE (AGPL-3.0-or-later) and THIRD-PARTY-LICENSES.txt
+miyu/       the core (miyu, miyu-sandbox, miyu-extract and these resources): LICENSE (AGPL-3.0-or-later),
+            LICENSES/ (Apache-2.0 for the parts listed in the core's README) and THIRD-PARTY-LICENSES.txt
+miyu-web/   the web app (packages/miyu-webui): LICENSE (AGPL-3.0-or-later) and THIRD-PARTY-LICENSES.txt
+"""
+
+
+def stage_licenses(app, core, web, dest):
+    """三份许可证和第三方许可证清单放进资源目录的 licenses/（施工 AP-5，原来外壳的 DT-7）：缺一份就停，不出没有清单的包。
+    核心、网页的清单是它们各自仓库生成、门禁守着的那一份，照钉的提交原样拷。"""
+    if dest.exists():
+        sys.exit(f'核心的资源目录里已经有 {dest.name}/：先问核心的会话')
+    parts = {
+        'miyu-app': (app, ['LICENSE', 'THIRD-PARTY-LICENSES.txt']),
+        'miyu': (core, ['LICENSE', 'LICENSES', 'THIRD-PARTY-LICENSES.txt']),
+        'miyu-web': (web, ['LICENSE', f'{WEB_PACKAGE}/THIRD-PARTY-LICENSES.txt']),
+    }
+    for part, (root, names) in parts.items():
+        for name in names:
+            src = root / name
+            target = dest / part / pathlib.Path(name).name
+            if src.is_dir():
+                shutil.copytree(src, target)
+            elif src.is_file():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, target)
+            else:
+                sys.exit(f'少了 {src}：安装包要带它（施工 AP-5）')
+    (dest / 'README.txt').write_text(LICENSES_README, encoding='utf-8')
+
+
 def main():
     ap = argparse.ArgumentParser(description='搭 Miyu 安装包的内容')
     ap.add_argument('--core', required=True, type=pathlib.Path, help='核心的检出，已经编过 release')
@@ -75,6 +110,11 @@ def main():
     (package / 'package.toml').write_text(manifest, encoding='utf-8')
     shutil.copy2(source / 'web.json', package / 'web.json')
     shutil.copytree(source / 'matugen', package / 'matugen')
+    # 许可证照 pack-web.py 放包的根上（网页的 0.1.0 起清单在 miyu-webui/ 里）：缺了就停，不出没有清单的包
+    for src, name in ((source / 'THIRD-PARTY-LICENSES.txt', 'THIRD-PARTY-LICENSES.txt'), (args.web / 'LICENSE', 'LICENSE')):
+        if not src.is_file():
+            sys.exit(f'网页少了 {src}：安装包要带它（施工 AP-5）')
+        shutil.copy2(src, package / name)
     for name in PAGES:
         page = args.web / 'web-demo' / name
         if page.is_dir():
@@ -86,7 +126,9 @@ def main():
             sys.exit(f'网页少了 {page}')
     copy_program(args.web_built or args.web / 'target' / 'release', 'miyu-web', exe, package / 'bin' / f'miyu-web{exe}')
 
-    pins = tomllib.loads((pathlib.Path(__file__).resolve().parent.parent / 'pins.toml').read_text(encoding='utf-8'))
+    app = pathlib.Path(__file__).resolve().parent.parent
+    stage_licenses(app, args.core, args.web, resources / 'licenses')
+    pins = tomllib.loads((app / 'pins.toml').read_text(encoding='utf-8'))
     (out / 'pins.txt').write_text(
         ''.join(f'{part}: {pins[part]["repo"]}@{pins[part]["rev"]}\n' for part in ('core', 'web')), encoding='utf-8')
     print(f'staged into {out}')

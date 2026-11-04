@@ -1,4 +1,4 @@
-# 三平台 CI（照网页仓库的那一份）：格式、clippy、测试、行数。Linux 先装托盘要的系统库（GTK 3；施工 AP-2 起不再要 WebKitGTK，
+# 三平台 CI（照网页仓库的那一份）：格式、clippy、测试、行数、许可证。Linux 先装托盘要的系统库（GTK 3；施工 AP-2 起不再要 WebKitGTK，
 # AP-3 托盘换成 ksni 后端、直接说 D-Bus，不再要 AppIndicator）。
 # 第五批审计 D5-3 复核：和 release.yml 的打包共用 rust-cache 的缓存，外部 action 同样按提交号钉、checkout 不留令牌，
 # 免得浮动标签被换掉以后弄脏缓存、经缓存进到发版包里。
@@ -40,15 +40,20 @@ jobs:
       - name: 格式
         run: cargo fmt --check
       - name: clippy
-        run: cargo clippy --all-targets --locked -- -D warnings
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: 测试
-        run: cargo test --locked --no-fail-fast
+        run: cargo test --workspace --locked --no-fail-fast
       - name: 行数（每个 .rs 不超过 500 行，测试也算）
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          over=$(find src -name '*.rs' -print0 | xargs -0 wc -l | awk '$2 != "total" && $1 > 500 {print}')
+          over=$(find src xtask/src -name '*.rs' -print0 | xargs -0 wc -l | awk '$2 != "total" && $1 > 500 {print}')
           if [ -n "$over" ]; then echo "超过 500 行：" && echo "$over" && exit 1; fi
+      # 施工 AP-5（原来外壳的 DT-7）：四个平台的第三方依赖都能和 AGPL 合在一起发，第三方许可证清单是最新的。
+      # cargo metadata --filter-platform 不用装别的目标，Linux 上一台查完四个。
+      - name: 许可证
+        if: runner.os == 'Linux'
+        run: cargo xtask licenses
       - name: 正式版（试验用，收下程序手测）
         run: cargo build --release --locked
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

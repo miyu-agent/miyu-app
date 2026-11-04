@@ -40,5 +40,5 @@ DT-7 许可证：照 miyu-im 搬许可证门禁、照核心 AU-2 出第三方许
 | AP-2 | 改名：GitHub 仓库 `miyu-desktop` → `miyu-app`，crate、程序名 `miyu-app`；去掉窗口、网页视图和只给它们用的几样（`app.md`「原来外壳的去留」），托盘换成 `tray-icon` + `tao`；托盘菜单的骨架（状态行照连接、停止和启动、重新启动、打开网页界面和设置、开机时启动、日志文件夹、关于、退出）、单实例。施工单 `AP-2-托盘骨架.md` | 这里 | 已完成（Linux 单测、真核心手动测试；三个平台的界面等出包手测） |
 | AP-3 | 托盘：AP-2 没做的那几样：Linux 换 `ksni` 后端（左键打开网页界面，不要 AppIndicator；2026-11-04 项目主人定）、软件包挂的入口（核心 TR-2）、局域网（「在手机上打开…」用浏览器打开网页设置里的二维码，网页 W-1086）、「没有响应」「出错了」；`app.md` 第 3、4 条。施工单 `AP-3-托盘补全.md` | 这里 | 已完成（Linux 单测、真核心手动测试、waybar 上经 D-Bus 测过左键和菜单每一项；Windows、macOS 的界面等出包手测） |
 | AP-4 | 系统通知：认领后台通知（核心 TR-1），订会话表和提醒，没有网页开着的会话由托盘弹，点了用浏览器打开那个会话（`miyu web --session`，网页 W-1085）；`notify-rust`（第 5 条）。施工单 `AP-4-系统通知.md` | 这里 | 已完成（Linux 单测、私有会话总线上假通知服务的真核心手动测试；Windows、macOS 弹不弹得出、点了回不回得来等出包手测） |
-| AP-5 | 打包：Windows 开始菜单、macOS `LSUIElement`、Linux `.desktop` 指向 `miyu-app`；带 DT-7 的许可证、DT-9 的 PowerShell 7 | 这里 | 待做 |
+| AP-5 | 打包：许可证门禁和托盘的第三方许可证清单（原 DT-7），安装包带托盘、核心、网页三份许可证；Windows 带官方 PowerShell 7（原 DT-9）、`miyu-app.exe` 带 Miyu 的图标和名字；macOS `LSUIElement`；deb、rpm 去掉 WebKitGTK 的依赖；打包流水线拆开核对。开始菜单、`.desktop` 指向 `miyu-app` AP-2 已做。施工单 `AP-5-安装包收尾.md` | 这里 | 在做 |
 | AP-6 | 网页：应用清单（能装成应用）；手机上的几处（W-1082） | 网页 | 待做 |

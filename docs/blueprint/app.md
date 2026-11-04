@@ -1,6 +1,6 @@
 ## Miyu 应用（miyu-app）
 
-状态：草案（施工 AP-1，2026-11-03；AP-2 托盘骨架、AP-3 托盘补全、AP-4 系统通知照实际做法改了几处，下面标了「AP-2」「AP-3」「AP-4」）。代替原来的桌面端外壳（`desktop.md`，Tauri 窗口，DT-1 到 DT-12）。
+状态：草案（施工 AP-1，2026-11-03；AP-2 托盘骨架、AP-3 托盘补全、AP-4 系统通知、AP-5 安装包收尾照实际做法改了几处，下面标了「AP-2」「AP-3」「AP-4」「AP-5」）。代替原来的桌面端外壳（`desktop.md`，Tauri 窗口，DT-1 到 DT-12）。
 
 ### 为什么换
 
@@ -97,6 +97,15 @@
 
 安装包里不再有网页视图，Linux 上不再要 WebKitGTK。
 
+实际做法（AP-5）：
+
+- 许可证：托盘的第三方许可证清单 `THIRD-PARTY-LICENSES.txt` 在仓库根上（`cargo xtask notices` 生成，照网页仓库的做法；CI 的 `cargo xtask licenses` 查四个平台的依赖都能和 AGPL-3.0-or-later 合在一起发、清单是最新的）。安装包的资源目录下 `licenses/` 放三份：`miyu-app/`、`miyu/`（核心钉的那一版的 `LICENSE`、`LICENSES/`、清单）、`miyu-web/`，加一份 `README.txt`；网页包的文件夹照网页 `pack-web.py` 的样子带它自己的 `LICENSE` 和清单。装好以后 Linux 在 `/usr/share/miyu/licenses/`，Windows 在 `resources\licenses\`，macOS 在 `Miyu.app/Contents/Resources/miyu/licenses/`。
+- PowerShell 7（只 Windows）：官方 zip 版，版本和两个 SHA256 钉在 `pins.toml` 的 `[pwsh]`（7.6.9，7.6 是 LTS），打包时下载、核对，解进资源目录的 `pwsh\`，核心先找它（核心 SW-5）；MSI 装卸前停进程的名单有它。
+- `miyu-app.exe` 的图标和名字：`build.rs` 编给 Windows 时用 `embed-resource` 把 `icons/icon.ico` 和版本信息（文件说明、产品名称「Miyu」）编进程序，资源管理器、任务管理器里是 Miyu 的图标和名字。release 照旧 `windows_subsystem = "windows"`（`src/main.rs`）。
+- macOS：`packaging/macos/Info.plist` 写 `LSUIElement = true`，经 `macos.json` 的 `infoPlist` 并进 `Miyu.app` 的 `Info.plist`；运行时另设 `Accessory`（AP-2）。
+- deb、rpm：Tauri 的打包工具总加 WebKitGTK 的依赖，打完由 `packaging/drop-webkit.py` 去掉（只改依赖，文件不动）；GTK 3、bubblewrap 照旧要。
+- 打包流水线拆开三个平台的包核对上面这些（`release.yml`「拆开核对」）。
+
 ### 网页要配的
 
 - 应用清单（`manifest.webmanifest`、几种尺寸的图标）：Edge、Chrome 里能「安装为应用」，独立窗口、有自己的图标。本机地址能不能装、要不要 Service Worker，先实测再定。
@@ -118,4 +127,4 @@ core1 2026-11-03 答复：
 - 留下：托盘、单实例、调主程序（`program.rs`）、叫核心停（`quit.rs`）、日志（`log.rs`）、给人看的字、图标、打包流水线、许可证门禁和清单、随包的 PowerShell 7。
 - 去掉：窗口、网页视图、导航和下载交给谁（`navigate.rs`、`download.rs`）、网页视图的通知替身（`notify.rs`、`resources/notification.js`）、macOS 的应用菜单（`menu.rs`）、窗口大小。
 - 分支 `step/DT-8-通知`（DT-7、DT-8、DT-9）不照原样合：许可证（DT-7）、PowerShell 7（DT-9）挪进 AP-5；DT-8 的通知是给网页视图的，不要了，系统通知改成第 5 条。
-- 程序换框架：只要托盘，不要网页视图，Tauri 换成更小的 `tray-icon` + `tao`（Tauri 自己的托盘就是它们），三个平台一份代码。AP-2 做了：`tao` 0.37.2（关了默认功能）、`tray-icon` 0.26.1（Linux 用 AppIndicator 后端；AP-3 换成 `ksni` 后端，见第 3 条）、`rfd` 0.17.2（消息框，Linux 用 GTK 画）、`notify` 8.2.1、`png`、`open`、`tokio`，`winreg`（只 Windows）；核心照 git 依赖钉 `miyu-client`（核心 main `d58f7b099`，同 `pins.toml` 的核心）。打包还用 Tauri 的打包工具：先 `cargo build --release`，再 `cargo tauri bundle`（`cargo tauri build` 总带 `tauri/custom-protocol` 特性，没有 tauri 依赖编不过），`tauri.conf.json` 只当打包配置；换不换留给 AP-5。
+- 程序换框架：只要托盘，不要网页视图，Tauri 换成更小的 `tray-icon` + `tao`（Tauri 自己的托盘就是它们），三个平台一份代码。AP-2 做了：`tao` 0.37.2（关了默认功能）、`tray-icon` 0.26.1（Linux 用 AppIndicator 后端；AP-3 换成 `ksni` 后端，见第 3 条）、`rfd` 0.17.2（消息框，Linux 用 GTK 画）、`notify` 8.2.1、`png`、`open`、`tokio`，`winreg`（只 Windows）；核心照 git 依赖钉 `miyu-client`（核心 main `d58f7b099`，同 `pins.toml` 的核心）。打包还用 Tauri 的打包工具：先 `cargo build --release`，再 `cargo tauri bundle`（`cargo tauri build` 总带 `tauri/custom-protocol` 特性，没有 tauri 依赖编不过），`tauri.conf.json` 只当打包配置；换不换留给 AP-5。AP-5 定不换：除了 deb、rpm 总加 WebKitGTK 的依赖（打完改掉，见「装在哪」），别的（三种语言的 MSI 和开始菜单的应用身份、`.app`、dmg、deb/rpm 的桌面文件和图标）都合用。原来 `tauri-build` 把图标编进 exe，现在是自己的 `build.rs`。

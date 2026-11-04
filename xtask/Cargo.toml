@@ -1,0 +1,22 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+license = "AGPL-3.0-or-later"
+description = "托盘仓库的门禁：cargo xtask licenses（照网页仓库的 xtask 搬的许可证一项，施工 AP-5）"
+publish = false
+
+[dependencies]
+# 只用来读 cargo metadata 的输出。和托盘用的同一版。
+serde_json = "1.0.154"
+
+# 同托盘的那几条（根上 Cargo.toml 的 [lints]）：门禁的小程序也不许 unsafe、不吞错误。
+[lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
+[lints.clippy]
+let_underscore_must_use = "deny"
+unused_result_ok = "deny"
+unwrap_used = "deny"
