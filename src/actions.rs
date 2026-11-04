@@ -70,6 +70,7 @@ pub fn open_web(ctx: &Ctx, settings: bool) {
             got = run_logged(miyu, program::WEB, program::WEB_LIMIT);
         }
         if let Some(detail) = failure(&got, &ctx.text) {
+            ctx.post.send(Event::Failed(detail.clone()));
             tell(&ctx.text, key::OPEN_FAILED, &detail);
         }
         // 没在跑的由 `miyu web` 拉起来了：叫连接马上再试，不光等文件变动。
@@ -211,6 +212,7 @@ fn start_now(ctx: &Ctx) -> bool {
     match got {
         Ok(()) => true,
         Err(why) => {
+            ctx.post.send(Event::Failed(why.clone()));
             tell(&ctx.text, key::START_FAILED, &why);
             false
         }
@@ -218,7 +220,8 @@ fn start_now(ctx: &Ctx) -> bool {
 }
 
 /// 照头的办法拉起核心（同终端、`miyu web`）：建好数据根的骨架（第一次用时写标记），连核心，没在跑就照 `miyu core` 拉起来，
-/// 等它说好了。连上的那条马上放掉：状态照托盘自己那条连接来。
+/// 等它说好了。连上的那条马上放掉：状态照托盘自己那条连接来。核心说了起不来的原因的，交回它的原话（照人的语言，例如「这是旧版
+/// Miyu 的数据根，新版不认」），状态行「出错了」下面照它写。
 pub(crate) fn start_core(miyu: &Path, root: &DataRoot) -> Result<(), String> {
     root.prepare().map_err(|error| error.to_string())?;
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -233,7 +236,10 @@ pub(crate) fn start_core(miyu: &Path, root: &DataRoot) -> Result<(), String> {
             command
         }))
         .map(drop)
-        .map_err(|error| error.to_string())
+        .map_err(|error| match error {
+            miyu_client::connect::StartError::Refused(reason) => reason,
+            other => other.to_string(),
+        })
 }
 
 /// 调一次 `miyu`，记下耗时和退出码（不记输出：`miyu web` 印的网址里有票）。

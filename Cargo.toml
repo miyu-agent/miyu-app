@@ -31,6 +31,10 @@ toml = "1.1.8"
 # 只经门面用：找数据根、资源目录，连核心，拉起核心。
 miyu-client = { git = "https://github.com/miyu-agent/miyu", rev = "d58f7b0990d92784c04142e114b886c8b1511ce5" }
 
+# 测试里拿暂停的时钟试「问不出话」（过了 rpc::SLOW 才回的），不用真等；两头一起跑用 `join!`。
+[dev-dependencies]
+tokio = { version = "1.54.1", features = ["macros", "test-util"] }
+
 # 「开机时启动」写当前用户的 Run 注册表项。
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56.0"

@@ -11,6 +11,7 @@
 `app.md` 照实际做法改了这几处（都标了「AP-3」）：
 
 - 第 3 条：Linux 换 `ksni` 后端定了、写明日期，没有 StatusNotifierItem 宿主的托盘显示不出来。
+- 第 4 条状态行：「没有响应」「出错了」怎么判断、什么时候放下。
 - 「原来外壳的去留」最后一条：`tray-icon` 的后端。
 
 ### 做了什么
@@ -19,9 +20,17 @@
    - 依赖：少了 `libappindicator`、`libappindicator-sys`、`libloading`、`dirs`、`dirs-sys`、`option-ext`（MPL-2.0，原来要在许可证清单里写源码地址的那一个）、`redox_users`、`libredox`；多了 `ksni` 0.3.6（Unlicense）、`zbus` 5.19.0 和 `zvariant`、`zbus_names` 这些（MIT），`async-io`、`async-executor`、`blocking`、`polling` 这一套 smol 的小库（Apache-2.0 OR MIT），`uuid`、`tempfile`、`hex`、`serde_repr`、`enumflags2` 等（MIT OR Apache-2.0），`endi`、`zcheapstr`、`uds_windows`、`tracing-attributes`（MIT）。都能和 AGPL-3.0-or-later 合在一起发。仓库还没有许可证门禁和第三方许可证清单（原 DT-7，挪到 AP-5），这一步照 `cargo metadata` 一个个看的。
    - 打包：deb 去掉 `libayatana-appindicator3-1`，rpm 去掉 `libayatana-appindicator-gtk3`，AUR 去掉 `libayatana-appindicator`；CI、打包流水线不再装 `libayatana-appindicator3-dev`。GTK 3 照旧要。README 照改。
 
+2. **状态行的「没有响应」「出错了」**：
+   - 新的 `src/rpc.rs`：一行一条的一问一答，托盘那条连接和以后临时连的都用它。编号每条连接一个随机前缀（`RandomState`，同一个进程里每个也不一样）接递增的数字：核心照编号认重发、不分连接，用过的编号再发拿到上一次的回应、什么都不做。等回应时推来的先攒着；读一行用 `read_until` 接着读，等回应过了时限丢下正在读的也不丢字。
+   - 「没有响应」：问出去的过了 `rpc::SLOW`（10 秒）没回，报一次「问不出话」，接着等；回了再报一次「答得上」。原来握手 30 秒没回就当连不上、写「已停止」，现在写「没有响应」，一直等到回或者断。不为这个定时去问（图纸「不定时去问」）。
+   - 「出错了」：`status.rs` 记最近一次的错，断着的时候写「出错了」和原因。哪些算：「启动」拉不起核心（核心的 `StartError::Refused` 只取原话，不带「核心起不来：」）、`miyu web` 没成、握手被拒（`link` 报 `Refused`，带核心回应的 `message`）、起来时找不到数据根、找不到主程序。连上了、再点「启动」放下。
+   - `link.rs` 换成照 `Rpc` 写，连上、问不出话、断了、被拒四种报给界面（`Report`）。
+
 ### 风险
 
 - 没有 StatusNotifierItem 宿主的托盘（只认 XEmbed 的老托盘、GNOME 没装 AppIndicator 扩展）显示不出图标：libayatana-appindicator 在这种地方会退回 GTK 的老图标，ksni 不会。`ksni` 照 `assume_sni_available(true)` 起，没有宿主不报错，宿主后来起来了照样挂上。
+- 「没有响应」只在托盘自己问的时候看得出：连着、核心没推东西、托盘也没问的时候核心卡住了，状态行照旧写「运行中」，直到下一次问或者断了。要随时知道得定时去问，图纸不许。
+- 「出错了」的原因有的只有中文：数据根认不出、建不成，连不上核心这几句是核心门面 `miyu-client` 写死的中文（`miyu-store`、`miyu-ipc` 的 `Display`），英文、日文系统上照样是中文；核心拉起时说的原因照核心的语言。要分语言得核心门面给原因码。
 - 菜单由宿主照 dbusmenu 画：字号、图标大小、灰的样子照宿主的（KDE、waybar、GNOME 扩展各不一样）；状态行带原因的那两行字在一个菜单项里，宿主认不认换行看它自己。
 
 ### 结果

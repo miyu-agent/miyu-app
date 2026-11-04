@@ -9,7 +9,8 @@ use tray_icon::menu::MenuId;
 
 use crate::actions::{self, Ctx};
 use crate::instance::Once;
-use crate::status::{self, Busy, Status};
+use crate::link::Report;
+use crate::status::{self, Busy, Linked, Status};
 use crate::text::Text;
 use crate::tray::{self, Tray, id};
 use crate::{autostart, log};
@@ -21,12 +22,14 @@ pub enum Event {
     Menu(MenuId),
     /// 点了托盘图标。
     Tray(TrayIconEvent),
-    /// 托盘那条连接报来：连上了、断了或者连不上。
-    Link(bool),
+    /// 托盘那条连接报来的。
+    Link(Report),
     /// 后台开始做一件起停的事（「重新启动」停完了、开始拉起）。
     Begin(Busy),
     /// 后台做完一件起停的事，带做成了没有。
     Done(Busy, bool),
+    /// 出错了：拉不起核心、打不开网页界面，带 `miyu` 说的那一句。状态行断着的时候写「出错了」和它。
+    Failed(String),
     /// 有人要打开网页界面：第二个起来的托盘、macOS 上点了程序坞或者再开一次。
     Open,
     /// 「退出 Miyu」停完了，现在退。
@@ -63,11 +66,16 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(ctx: Ctx, open_at_start: bool) -> Self {
+    /// `problem` 是起来时就知道的错（找不到数据根、找不到主程序），状态行照它写「出错了」。
+    pub fn new(ctx: Ctx, open_at_start: bool, problem: Option<String>) -> Self {
+        let mut status = Status::default();
+        if let Some(problem) = problem {
+            status.fail(problem);
+        }
         Self {
             text: Arc::clone(&ctx.text),
             ctx,
-            status: Status::default(),
+            status,
             tray: None,
             open_at_start,
             quitting: false,
@@ -92,13 +100,7 @@ impl App {
             _ if self.quitting => {}
             Event::Menu(item) => self.menu(item.as_ref()),
             Event::Tray(event) => self.clicked(&event),
-            Event::Link(up) => {
-                self.status.link(up);
-                if up {
-                    start_log(&self.ctx);
-                }
-                self.redraw();
-            }
+            Event::Link(report) => self.linked(report),
             Event::Begin(busy) => {
                 self.status.begin(busy);
                 self.redraw();
@@ -107,12 +109,32 @@ impl App {
                 self.status.done(busy, ok);
                 self.redraw();
             }
+            Event::Failed(reason) => {
+                self.status.fail(reason);
+                self.redraw();
+            }
             Event::Open => {
                 if self.asked.allow(Instant::now()) {
                     actions::open_web(&self.ctx, false);
                 }
             }
         }
+    }
+
+    fn linked(&mut self, report: Report) {
+        match report {
+            Report::Up => {
+                self.status.link(Linked::Up);
+                start_log(&self.ctx);
+            }
+            Report::Slow => self.status.link(Linked::Slow),
+            Report::Down => self.status.link(Linked::Down),
+            Report::Refused(why) => {
+                self.status.link(Linked::Down);
+                self.status.fail(why);
+            }
+        }
+        self.redraw();
     }
 
     fn menu(&mut self, item: &str) {

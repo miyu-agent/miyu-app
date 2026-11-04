@@ -4,19 +4,19 @@ use super::*;
 fn the_link_alone_says_running_or_stopped() {
     let mut status = Status::default();
     assert_eq!(status.state(), State::Stopped);
-    status.link(true);
+    status.link(Linked::Up);
     assert_eq!(status.state(), State::Running);
-    status.link(false);
+    status.link(Linked::Down);
     assert_eq!(status.state(), State::Stopped);
 }
 
 #[test]
 fn stopping_shows_until_the_stop_is_done_even_after_the_link_drops() {
     let mut status = Status::default();
-    status.link(true);
+    status.link(Linked::Up);
     status.begin(Busy::Stopping);
     assert_eq!(status.state(), State::Stopping);
-    status.link(false);
+    status.link(Linked::Down);
     assert_eq!(status.state(), State::Stopping);
     status.done(Busy::Stopping, true);
     assert_eq!(status.state(), State::Stopped);
@@ -25,7 +25,7 @@ fn stopping_shows_until_the_stop_is_done_even_after_the_link_drops() {
 #[test]
 fn a_failed_stop_goes_back_to_what_the_link_says() {
     let mut status = Status::default();
-    status.link(true);
+    status.link(Linked::Up);
     status.begin(Busy::Stopping);
     status.done(Busy::Stopping, false);
     assert_eq!(status.state(), State::Running);
@@ -38,7 +38,7 @@ fn starting_waits_for_the_link_after_the_start_is_done() {
     status.done(Busy::Starting, true);
     // 拉起来了、连接还没报：照旧写「正在启动…」，不闪「已停止」。
     assert_eq!(status.state(), State::Starting);
-    status.link(true);
+    status.link(Linked::Up);
     assert_eq!(status.state(), State::Running);
 }
 
@@ -46,7 +46,7 @@ fn starting_waits_for_the_link_after_the_start_is_done() {
 fn starting_that_already_has_the_link_ends_at_once() {
     let mut status = Status::default();
     status.begin(Busy::Starting);
-    status.link(true);
+    status.link(Linked::Up);
     assert_eq!(status.state(), State::Starting);
     status.done(Busy::Starting, true);
     assert_eq!(status.state(), State::Running);
@@ -105,7 +105,7 @@ fn busy_greys_both_lines_and_keeps_them_in_place() {
 }
 
 #[test]
-fn the_reserved_states_already_have_their_look() {
+fn unresponsive_and_failed_have_their_look() {
     let hung = look(&State::Unresponsive);
     assert_eq!((hung.toggle, hung.toggle_enabled), (Toggle::Stop, true));
     assert!(hung.restart_enabled);
@@ -117,4 +117,41 @@ fn the_reserved_states_already_have_their_look() {
         (Toggle::Start, true)
     );
     assert!(failed.restart_enabled);
+}
+
+#[test]
+fn a_slow_link_is_unresponsive_until_it_answers() {
+    let mut status = Status::default();
+    status.link(Linked::Up);
+    status.link(Linked::Slow);
+    assert_eq!(status.state(), State::Unresponsive);
+    assert!(status.is_up(), "问不出话的照旧能「停止」");
+    status.link(Linked::Up);
+    assert_eq!(status.state(), State::Running);
+}
+
+#[test]
+fn a_failure_shows_while_down_and_goes_once_linked_or_restarted() {
+    let mut status = Status::default();
+    status.begin(Busy::Starting);
+    status.fail("这是旧版 Miyu 的数据根".into());
+    status.done(Busy::Starting, false);
+    assert_eq!(
+        status.state(),
+        State::Failed("这是旧版 Miyu 的数据根".into())
+    );
+    // 还连不上的照旧是出错了。
+    status.link(Linked::Down);
+    assert!(matches!(status.state(), State::Failed(_)));
+    // 再点「启动」先放下上一次的。
+    status.begin(Busy::Starting);
+    assert_eq!(status.state(), State::Starting);
+    status.done(Busy::Starting, false);
+    assert_eq!(status.state(), State::Stopped);
+    // 连着的时候出的错不盖住「运行中」，连上了就放下。
+    status.fail("握手被拒".into());
+    status.link(Linked::Up);
+    assert_eq!(status.state(), State::Running);
+    status.link(Linked::Down);
+    assert_eq!(status.state(), State::Stopped);
 }

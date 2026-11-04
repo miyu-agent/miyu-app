@@ -1,28 +1,41 @@
-//! 托盘连核心看状态（图纸 `app.md` 第 4 条状态行、「要核心给的」第一条）：连已经在跑的核心（不拉起），出示本机令牌握手，连着就是
+//! 托盘连核心看状态（图纸 `app.md` 第 4 条、「要核心给的」第一条）：连已经在跑的核心（不拉起），出示本机令牌握手，连着就是
 //! 「运行中」，断了、连不上就是「已停止」；不定时去问。连不上的时候盯着数据根的 `run/`（系统的文件变动通知）：别人把核心拉起来了，
 //! 核心会在那里换令牌、写套接字的位置，一变就再连一次。
 //!
-//! 连法同核心门面的 `Core::connect_running`（`miyu-client` 的 `connect::connect` 加同一句 `hello`），只是自己拿着读的那一半：
-//! `Core` 只能一问一答，等不了「断了」（`call` 30 秒没回就当没回应），网页软件跟着配置的那条连接（网页 `follow.rs`）也是这样写的。
+//! 连法同核心门面的 `Core::connect_running`（`miyu-client` 的 `connect::connect` 加同一句 `hello`），只是自己拿着这条连接（[`Rpc`]）：
+//! `Core` 只能一问一答，等不了「断了」，也收不了推送。网页软件跟着配置的那条连接（网页 `follow.rs`）也是这样写的。
+//!
+//! 「没有响应」：问出去的（握手）过了 [`rpc::SLOW`] 还没回报 [`Report::Slow`]，接着等，回了再报 [`Report::Up`]。连着、
+//! 托盘不问什么的时候不知道核心卡没卡住：不为这个定时去问。「出错了」的一种：握手被拒（本机令牌不对、协议版本谈不拢），报
+//! [`Report::Refused`] 带核心的原话。
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use miyu_client::connect::Connection;
 use miyu_client::places::DataRoot;
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use serde_json::{Value, json};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
 use crate::log;
+use crate::rpc::{self, Failure, Rpc};
 
 /// 握手时报的头。
 pub const KIND: &str = "miyu-app";
 /// 文件一变不马上连：核心起来那几步（换令牌、听套接字、写位置）一连串，等它们落定。
 const SETTLE: Duration = Duration::from_millis(150);
-/// 握手最多等多久（同核心门面的一问一答）。
-const HELLO_LIMIT: Duration = Duration::from_secs(30);
+
+/// 那条连接报来的。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Report {
+    /// 连上了、握过手，答得上话。
+    Up,
+    /// 连着，问出去的迟迟不回（「没有响应」）。
+    Slow,
+    /// 断了或者连不上。
+    Down,
+    /// 连上了，握手被核心拒了：带核心的原话（照这台电脑的语言）。
+    Refused(String),
+}
 
 /// 叫那条连接马上再试一次（托盘自己起停了核心以后）。
 #[derive(Clone)]
@@ -36,8 +49,8 @@ impl Waker {
     }
 }
 
-/// 起一个线程连核心、跟着它：每连一次报一次（`true` 连上了，`false` 断了或者连不上），不论和上次一不一样。
-pub fn spawn(root: DataRoot, report: impl Fn(bool) + Send + 'static) -> Waker {
+/// 起一个线程连核心、跟着它：每连一次、每变一样报一次（不论和上次一不一样）。
+pub fn spawn(root: DataRoot, report: impl Fn(Report) + Send + 'static) -> Waker {
     let (send, receive) = unbounded_channel();
     let waker = Waker(send.clone());
     let started = std::thread::Builder::new()
@@ -49,11 +62,21 @@ pub fn spawn(root: DataRoot, report: impl Fn(bool) + Send + 'static) -> Waker {
     waker
 }
 
+/// 一次连接怎么完的。
+enum Ended {
+    /// 连上过，后来断了：马上再连一次。
+    Closed(String),
+    /// 连不上（核心没在跑）。
+    Absent(String),
+    /// 握手被拒。
+    Refused(String),
+}
+
 fn follow(
     root: &DataRoot,
     send: UnboundedSender<()>,
     mut receive: UnboundedReceiver<()>,
-    report: &dyn Fn(bool),
+    report: &dyn Fn(Report),
 ) {
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -78,26 +101,28 @@ fn follow(
             if let Some(watch) = watch.as_mut() {
                 watch.rearm();
             }
-            match open(root).await {
-                Ok(link) => {
-                    said(&mut was, true, "connected");
-                    report(true);
-                    let why = link.closed().await;
+            match session(root, report, &mut was).await {
+                Ended::Closed(why) => {
                     log::line(&format!("core link closed: {why}"));
                     // 断了马上再连一次：核心崩了、被叫停的连不上，报「已停止」；只是这条连接断了的接着连上。
                     tokio::time::sleep(SETTLE).await;
                     drain(&mut receive);
+                    continue;
                 }
-                Err(why) => {
+                Ended::Absent(why) => {
                     said(&mut was, false, &why);
-                    report(false);
-                    if receive.recv().await.is_none() {
-                        return;
-                    }
-                    tokio::time::sleep(SETTLE).await;
-                    drain(&mut receive);
+                    report(Report::Down);
+                }
+                Ended::Refused(why) => {
+                    said(&mut was, false, &format!("refused: {why}"));
+                    report(Report::Refused(why));
                 }
             }
+            if receive.recv().await.is_none() {
+                return;
+            }
+            tokio::time::sleep(SETTLE).await;
+            drain(&mut receive);
         }
     });
 }
@@ -114,97 +139,31 @@ fn drain(receive: &mut UnboundedReceiver<()>) {
     while receive.try_recv().is_ok() {}
 }
 
-/// 连着的核心：读到头就是断了。写的那一半拿着不放：放了不碍事，拿着免得哪个平台上半关了连接。
-struct Link {
-    lines: BufReader<ReadHalf<Connection>>,
-    _write: WriteHalf<Connection>,
-}
-
-/// 连已经在跑的核心、握手。
-async fn open(root: &DataRoot) -> Result<Link, String> {
-    let (connection, token) = miyu_client::connect::connect(root)
-        .await
-        .map_err(|error| error.to_string())?;
-    let (read, mut write) = tokio::io::split(connection);
-    let hello = hello(&token, &miyu_client::open::locale());
-    write
-        .write_all(format!("{hello}\n").as_bytes())
-        .await
-        .map_err(|error| error.to_string())?;
-    write.flush().await.map_err(|error| error.to_string())?;
-    let mut lines = BufReader::new(read);
-    tokio::time::timeout(HELLO_LIMIT, shaken(&mut lines))
-        .await
-        .map_err(|_| "no answer to hello".to_string())??;
+/// 连一次：握手，一直读到断。
+async fn session(root: &DataRoot, report: &dyn Fn(Report), was: &mut Option<bool>) -> Ended {
+    let (connection, token) = match miyu_client::connect::connect(root).await {
+        Ok(got) => got,
+        Err(error) => return Ended::Absent(error.to_string()),
+    };
+    let (read, write) = tokio::io::split(connection);
+    let mut rpc = Rpc::new(read, write);
+    let mut slow = |late: bool| report(if late { Report::Slow } else { Report::Up });
+    let hello = rpc::hello(&token, &miyu_client::open::locale());
+    match rpc.call("hello", hello, &mut slow).await {
+        Ok(_) => {}
+        Err(Failure::Refused { message, .. }) => return Ended::Refused(message),
+        Err(Failure::Closed(why)) => return Ended::Closed(why),
+    }
+    said(was, true, "connected");
+    report(Report::Up);
     // AP-4 挂在这里：握手以后调 `notices.claim`（参数空，回 `{}`；核心 TR-1），说「后台通知由托盘来发」，核心按这条连接记、
-    // 断了就作废；再订会话状态和 `notices` 流，照它们发系统通知。这一步不发，连接只用来看在不在。
-    Ok(Link {
-        lines,
-        _write: write,
-    })
-}
-
-/// 等握手的回应。
-async fn shaken(lines: &mut BufReader<ReadHalf<Connection>>) -> Result<(), String> {
-    let mut line = String::new();
+    // 断了就作废；再订会话状态和 `notices` 流，照它们发系统通知。
+    // 推来的不看（这一步不订推送）。
     loop {
-        line.clear();
-        let read = lines
-            .read_line(&mut line)
-            .await
-            .map_err(|error| error.to_string())?;
-        if read == 0 {
-            return Err("core disconnected".into());
-        }
-        if let Some(answer) = hello_answer(&line) {
-            return answer;
+        if let Err(failure) = rpc.push().await {
+            return Ended::Closed(failure.said().to_string());
         }
     }
-}
-
-impl Link {
-    /// 一直读到断，交回为什么断。推来的东西不看（这一步不订推送）。
-    async fn closed(mut self) -> String {
-        let mut line = String::new();
-        loop {
-            line.clear();
-            match self.lines.read_line(&mut line).await {
-                Ok(0) => return "disconnected".into(),
-                Ok(_) => {}
-                Err(error) => return error.to_string(),
-            }
-        }
-    }
-}
-
-/// 握手那一句：出示本机令牌，报自己是托盘（同核心门面 `Core::shake` 的写法）。
-fn hello(token: &str, locale: &str) -> Value {
-    json!({
-        "jsonrpc": "2.0",
-        "id": "hello",
-        "method": "hello",
-        "params": {
-            "protocol": [1, 1],
-            "token": token,
-            "head": {"kind": KIND, "version": env!("CARGO_PKG_VERSION")},
-            "locale": locale,
-        },
-    })
-}
-
-/// 读一行：是握手的回应的，交回成没成（没成的带核心的原话）；别的交 `None`。
-fn hello_answer(line: &str) -> Option<Result<(), String>> {
-    let reply: Value = serde_json::from_str(line).ok()?;
-    if reply["id"] != json!("hello") {
-        return None;
-    }
-    Some(match reply.get("result") {
-        Some(_) => Ok(()),
-        None => Err(reply["error"]["message"]
-            .as_str()
-            .unwrap_or("refused")
-            .to_string()),
-    })
 }
 
 /// 盯着 `run/`：没有的盯着数据根，数据根也没有的盯着它的上一级（第一次装上、核心还没起过）。每连一次之前重新看该盯哪里。

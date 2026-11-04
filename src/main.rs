@@ -14,6 +14,7 @@ mod link;
 mod log;
 mod program;
 mod quit;
+mod rpc;
 mod status;
 mod text;
 mod tray;
@@ -32,10 +33,12 @@ use crate::text::Text;
 fn main() {
     let text = Arc::new(Text::system());
     let autostarted = std::env::args().skip(1).any(|arg| arg == autostart::ARG);
+    let mut problem = None;
     let root = match DataRoot::locate(&Env::current()) {
         Ok(root) => Some(root),
         Err(error) => {
             log::line(&format!("no data root: {error}"));
+            problem = Some(error.to_string());
             None
         }
     };
@@ -113,14 +116,17 @@ fn main() {
         .map(|root| link::spawn(root, move |up| on_link.send(Event::Link(up))));
     let miyu = program::locate_here();
     log::line(&format!("main program found: {}", miyu.is_some()));
+    if miyu.is_none() {
+        problem.get_or_insert_with(|| text.get(crate::text::key::NO_PROGRAM).to_owned());
+    }
     let ctx = Ctx {
         miyu,
         root,
-        text,
+        text: Arc::clone(&text),
         post,
         waker,
     };
-    let mut app = App::new(ctx, !autostarted);
+    let mut app = App::new(ctx, !autostarted, problem);
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
         match event {
