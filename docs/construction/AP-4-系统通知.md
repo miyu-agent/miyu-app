@@ -98,4 +98,6 @@
 
 ### 结果
 
-- 提交：见下（补这一节的提交里填）。
+- 提交：`200becf` 依赖、`2fcc10c` 系统通知，以及补这一节的那一个。
+- CI（`ci.yml`）：运行 41808854481（`2fcc10c`）Linux、macOS、Windows 三台都绿。
+- 打包（`release.yml`）：运行 41808854518（`2fcc10c`）三台都绿。下了 Windows 的中文 MSI 查字符串表：`System.AppUserModel.ID` 和 `io.github.miyu-agent.miyu-app` 都在（开始菜单快捷方式带着应用身份）；装上以后快捷方式上真有没有，手测时用 PowerShell 看一眼（`(New-Object -ComObject Shell.Application)` 读不出这一格，用 `Get-StartApps | ? Name -eq Miyu` 看 `AppID` 是不是它）。
