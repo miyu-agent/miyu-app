@@ -1,6 +1,6 @@
 ## AP-3：托盘补全
 
-状态：做着（2026-11-04）。
+状态：已完成（2026-11-04，Linux 单测、真核心的手动测试、waybar 上经 D-Bus 测过左键和菜单每一项；三平台 CI、打包见「结果」）。Windows、macOS 的界面没人手测过，见「要人手测的」。
 
 ### 目的
 
@@ -50,6 +50,40 @@
 - 托盘改 `web.listen` 不经网页软件的 `POST /listen`：网页设置页存完会请网页软件当场换、拿换完的地址，托盘只写配置、靠网页软件自己跟着配置的推送换（网页 `follow.rs`，2026-10-30 起有）。网页软件没在跑的时候只是写了配置，下次起来照它听。
 - 菜单由宿主照 dbusmenu 画：字号、图标大小、灰的样子照宿主的（KDE、waybar、GNOME 扩展各不一样）；状态行带原因的那两行字在一个菜单项里，宿主认不认换行看它自己。
 
+### 不做什么
+
+- 系统通知（AP-4）：`link.rs` 握手以后照旧留着 `notices.claim` 的位置。
+- 菜单打开前去问一遍（软件包、局域网、核心卡没卡住）：托盘库不给「菜单要打开了」的口子（ksni 有 `menu_about_to_show`，`tray-icon` 没转出来），也违背「不定时去问」。
+- 许可证门禁、第三方许可证清单（AP-5）。
+
+### 怎么验
+
+1. 每个提交前 `cargo fmt --check`、`cargo clippy --all-targets --locked -- -D warnings`、`cargo test --locked`（做完是 83 个）过；每个 `.rs` 不超过 500 行（最长的 `actions.rs` 约 350 行）。
+2. 单测钉住的：一问一答照编号对上、中间推来的攒着、编号每条连接不一样、拒了的带原因码和原话、过了 10 秒才回的先报慢再报好、半行先到不丢字、断了就断（`rpc`，暂停的时钟）；软件包挂哪几行、推来的变动换掉删掉、装卸和只是变了分得开（`extras`）；`web.listen` 的值哪些算开、`config.get` 的回应、推来的 `keys` 里有没有它（`extras`）；打开、关掉写的参数、握手回应里设没设密码（`lan`）；没有响应、出错了什么时候写、什么时候放下，「运行中 · 局域网」，「局域网访问」只在运行中能点（`status`）；每一处网页的参数（`actions`）；三份字一样的键（`text`）。
+3. 真核心的手动测试（`#[ignore]`，`src/link/tests.rs`，只认指到临时目录的 `MIYU_HOME`）：
+   `MIYU_HOME=$(mktemp -d) MIYU_RESOURCES=<资源目录> MIYU_TEST_PROGRAM=<miyu> cargo test -- --ignored a_real_core`
+   用 `~/.cache/miyu-web-demo/core-target-debug/debug/miyu` 和 `core-fc48ba0c0/resources`（协议同 `d58f7b099`，只加不减）过：起来先报连不上，只靠盯 `run/` 跟上别人拉起的核心，报连上、软件包的入口（出厂的一个都没有）、局域网（这份资源目录没有网页包，报不认），停了报断。
+4. 本机 waybar 上实测（不碰真桌面的窗口）：托盘的 `GDK_BACKEND=x11`、`DISPLAY` 指到自己起的 Xvfb（消息框画在那里，不上真桌面），会话的 D-Bus 照旧（图标挂在 waybar 上，测完就退）；`MIYU_PROGRAM` 指到一个记参数的替身，`web …` 只记不开，别的转给真核心；数据根是新的空目录，测完删掉。菜单的结构用 `com.canonical.dbusmenu` 的 `GetLayout` 看，点菜单用 `Event <编号> clicked`，左键用 SNI 的 `Activate`：
+   - SNI：`Menu` 是 `/MenuBar`、`ItemIsMenu` 是假；`Activate` 以后替身记到 `web`。
+   - 菜单从上往下：状态行、停止、重新启动｜打开网页界面、设置…｜打开托盘测试（装了测试包时）｜局域网访问（装了网页包时）｜开机时启动、打开日志所在的文件夹｜关于 Miyu、退出 Miyu，同样板。
+   - 出错了：数据根放了别的文件，点「启动」，状态行「出错了」下面是 `miyu-client` 那一句（数据根认不出），「启动」「重新启动」能点。
+   - 没有响应：拿一个握手 15 秒才回的假核心，前 10 秒「已停止」，10 秒以后「没有响应」（「停止」能点），回了以后「运行中」。
+   - 软件包挂的入口：装写了 `[tray]` 的测试扩展，马上多一组「打开托盘测试」，点了替身记到 `web --package traytest`；`package.disable` 以后没了、`package.enable` 又出来、`miyu pkg remove` 以后没了。
+   - 局域网：装网页包的清单以后出这一组；没设密码点它，替身记到 `web --settings access`、配置没动；`account.setup` 设了密码再点，`web.listen` 变成 `0.0.0.0`，打勾、多出「在手机上打开…」（点了替身记到 `web --settings access`），状态行「运行中 · 局域网」；再点关掉，回到默认；从外面 `config.set` 改、恢复默认，托盘跟着变；「停止」以后这一行灰着。
+   - 退出：替身记到 `web --stop`、`core stop`，托盘退了、核心不在听了（核心带着在跑的扩展时要等几秒）。
+
+### 要人手测的（出包以后）
+
+- Linux 别的托盘宿主：KDE Plasma、GNOME 加 AppIndicator 扩展、XFCE 的状态栏插件。左键打开网页界面、右键出菜单；菜单的图标、圆点、灰的样子；状态行「出错了」下面那一句原因换不换行。没有 SNI 宿主的桌面上没有图标（已知）。
+- Windows 虚拟机（装这一步的 MSI）：
+  - 菜单的新几组：装一个写了 `[tray]` 的包（或者 im），菜单多一行，点了浏览器打开那个包的后台页；卸掉以后那一行没了。
+  - 局域网：没设访问密码时点「局域网访问」，浏览器打开设置「通用」并滚到「访问」那一组，勾不打上；在网页里设了密码再点，打勾、多「在手机上打开…」，状态行「运行中 · 局域网」，手机能连上；点「在手机上打开…」浏览器到「访问」那一组、看得到地址和二维码；再点关掉，手机连不上了。点了以后勾会不会闪一下（托盘库先翻、托盘再翻回来）。
+  - 「出错了」：数据根指到一个放了别的东西的目录，点「启动」，状态行两行字（Windows 菜单认不认换行）。
+  - 左键照旧打开网页界面。
+- macOS：同 Windows 那几样；菜单整个换一份（装卸包、局域网开关）时菜单栏的图标不闪、不丢。
+
 ### 结果
 
-（做完补）
+- 提交：`bdd0e39` 换 ksni、`0704cd3` 状态行、`d17f773` 软件包挂的入口、`257c8dc` 局域网，以及补这一节的那一个。
+- CI（`ci.yml`）：运行 41792684256（`257c8dc`）Linux、macOS、Windows 三台都绿。
+- 打包（`release.yml`）：运行 41792684367（`257c8dc`）三台都绿。拆开 Linux 的 deb 看：`Depends: libgtk-3-0, bubblewrap, libwebkit2gtk-4.1-0, libgtk-3-0`，没有 libayatana-appindicator 了（`libwebkit2gtk-4.1-0` 是 Tauri 打包工具自己加的，AP-2 记过，留给 AP-5）；PKGBUILD 的 `depends=('gtk3' 'bubblewrap')`。
