@@ -17,6 +17,7 @@ mod link;
 mod log;
 mod program;
 mod quit;
+mod reason;
 mod rpc;
 mod status;
 mod text;

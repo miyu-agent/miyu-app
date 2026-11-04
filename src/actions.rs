@@ -282,7 +282,10 @@ fn start_now(ctx: &Ctx) -> bool {
 /// 等它说好了。连上的那条马上放掉：状态照托盘自己那条连接来。核心说了起不来的原因的，交回它的原话（照人的语言，例如「这是旧版
 /// Miyu 的数据根，新版不认」），状态行「出错了」下面照它写。
 pub(crate) fn start_core(miyu: &Path, root: &DataRoot) -> Result<(), String> {
-    root.prepare().map_err(|error| error.to_string())?;
+    let lang = crate::text::Lang::of_locale(&crate::text::system_locale());
+    // 认不出的数据根带代码（核心 LC-1）：照托盘的语言写，别的照原话
+    root.prepare()
+        .map_err(|error| crate::reason::say(error.code(), &error.to_string(), root, lang))?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -296,7 +299,9 @@ pub(crate) fn start_core(miyu: &Path, root: &DataRoot) -> Result<(), String> {
         }))
         .map(drop)
         .map_err(|error| match error {
-            miyu_client::connect::StartError::Refused(reason) => reason,
+            miyu_client::connect::StartError::Refused { code, reason } => {
+                crate::reason::say(code.as_deref(), &reason, root, lang)
+            }
             other => other.to_string(),
         })
 }

@@ -4,7 +4,7 @@
 
 [core]
 repo = "miyu-agent/miyu"
-rev = "d58f7b0990d92784c04142e114b886c8b1511ce5"
+rev = "61f1f3ef27852a8a2ae3a37cb3bb29be8da9b4dc"
 
 [web]
 repo = "miyu-agent/miyu-web"

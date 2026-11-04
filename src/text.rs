@@ -107,6 +107,15 @@ impl Lang {
         }
     }
 
+    /// 核心资源目录里说法的语言名（`human/<语言>.json`）。
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::Zh => "zh",
+            Self::En => "en",
+            Self::Ja => "ja",
+        }
+    }
+
     fn source(self) -> &'static str {
         match self {
             Self::Zh => include_str!("../resources/text/zh.toml"),
