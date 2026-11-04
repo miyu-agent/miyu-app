@@ -3,7 +3,8 @@
 #   dist/binaries/<程序>-<目标三元组>[.exe]  Tauri 的 externalBin：装在托盘程序旁边，名字去掉三元组
 #   dist/resources/                         核心仓库的整份 resources/，加网页包的文件夹 packages/miyu-webui/
 #   dist/pins.txt                           钉的两个提交号，写进发版说明
-# 网页包的文件夹照网页仓库 tools/pack-web.py 装好的样子（网页的会话 2026-10-30 定）：清单补 version、不写 targets，
+# 网页包的文件夹照网页仓库 tools/pack-web.py 装好的样子（网页的会话 2026-10-30 定）：清单没写 version 的补上（照网页的工作区版本）；
+# 网页 W-1095（0.1.0）起清单自己写 version 和 targets 三种，照原样用，version 要和工作区版本一样，
 # web.json、matugen/ 原样，pages/ 是 web-demo 里给浏览器的七样，程序放 bin/。
 #   python3 packaging/stage.py --core <核心检出> --web <网页检出> --triple <rustc 的 host> --out dist
 import argparse, pathlib, re, shutil, sys, tomllib
@@ -23,8 +24,12 @@ def workspace_version(root):
 
 
 def with_version(manifest, version):
-    if re.search(r'^(version|targets)\s*=', manifest, re.M):
-        sys.exit(f'{WEB_PACKAGE}/package.toml 自己写了 version 或 targets：不覆盖，先找网页的会话')
+    written = tomllib.loads(manifest).get('package', {}).get('version')
+    if written is not None:
+        # 网页 W-1095 起清单自己写：照原样，和工作区版本对不上的不装
+        if written != version:
+            sys.exit(f'{WEB_PACKAGE}/package.toml 的 version {written!r} 和网页的工作区版本 {version!r} 不一样：先找网页的会话')
+        return manifest
     head = re.search(r'^\[package\]\n', manifest, re.M)
     if not head:
         sys.exit(f'{WEB_PACKAGE}/package.toml 里没有 [package]')
