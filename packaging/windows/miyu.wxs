@@ -2,8 +2,8 @@
 <!--
   Windows 安装包（MSI，x64）的自定义步骤（施工 DT-6；项目主人 2026-10-30 定安装程序要 64 位，NSIS 只有 32 位，换 WiX 出的 MSI）。
   只有一步：装、卸、修之前把在跑的停掉，不然程序被占着换不掉、删不掉。先 `miyu core stop`，再照路径结束这个安装目录下还在跑的
-  miyu-web、miyu、miyu-extract、miyu-sandbox（网页软件没有停的命令，它空闲 10 分钟才自己退）。用 64 位的 PowerShell
-  （System64Folder），以安装的那个人跑（immediate），进程是他的。失败不挡安装（Return="ignore"）。
+  miyu-web、miyu、miyu-extract、miyu-sandbox 和带的 pwsh（施工 AP-5：核心在沙盒里跑命令用的那个）（网页软件没有停的命令，它空闲
+  10 分钟才自己退）。用 64 位的 PowerShell（System64Folder），以安装的那个人跑（immediate），进程是他的。失败不挡安装（Return="ignore"）。
   沙盒不用配：MXC 跑命令不要沙盒用户、不要管理员（核心的主会话 2026-10-30，蓝图 sandbox/windows-run.md）。
   经 tauri.conf 的 componentGroupRefs 引用 MiyuStopRunning 这一组，整个片段才进安装包。
 -->
@@ -12,7 +12,7 @@
     <ComponentGroup Id="MiyuStopRunning" />
     <SetProperty Id="MIYU_POWERSHELL" Value="[System64Folder]WindowsPowerShell\v1.0\powershell.exe" Before="MiyuStopRunning" Sequence="execute" />
     <CustomAction Id="MiyuStopRunning" Property="MIYU_POWERSHELL" Execute="immediate" Return="ignore"
-      ExeCommand="-NoProfile -NonInteractive -WindowStyle Hidden -Command &quot;&amp; '[INSTALLDIR]miyu.exe' core stop; Get-Process miyu-web,miyu,miyu-extract,miyu-sandbox -ErrorAction SilentlyContinue | Where-Object Path -like '[INSTALLDIR]*' | Stop-Process -Force&quot;" />
+      ExeCommand="-NoProfile -NonInteractive -WindowStyle Hidden -Command &quot;&amp; '[INSTALLDIR]miyu.exe' core stop; Get-Process miyu-web,miyu,miyu-extract,miyu-sandbox,pwsh -ErrorAction SilentlyContinue | Where-Object Path -like '[INSTALLDIR]*' | Stop-Process -Force&quot;" />
     <InstallExecuteSequence>
       <Custom Action="MiyuStopRunning" Before="InstallValidate" />
     </InstallExecuteSequence>
