@@ -127,6 +127,12 @@ fn a_package_covered_by_a_higher_layer_is_not_the_one_read() {
     ]}));
     assert_eq!(packages.version("miyu-webui").as_deref(), Some("0.2.0"));
     assert_eq!(packages.version("kit").as_deref(), Some("1.0"));
+    // SD-1补 起改名 shadowed，照样跳过
+    packages.replace(&json!({"packages": [
+        {"package": "miyu-webui", "layer": "home", "version": "0.2.0"},
+        {"package": "miyu-webui", "layer": "distro", "shadowed": {"by": "home", "version": "0.3.0"}},
+    ]}));
+    assert_eq!(packages.version("miyu-webui").as_deref(), Some("0.2.0"));
     // 推来被盖住那份的变动：认的那份不动
     let changed = packages.change(&json!({"package": "miyu-webui", "entry": {"package": "miyu-webui", "layer": "distro", "covered": {"by": "home"}}}));
     assert!(!changed);

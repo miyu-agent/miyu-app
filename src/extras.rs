@@ -83,10 +83,10 @@ impl Packages {
     }
 }
 
-/// 被上面一层盖住的那份（核心 SD-1：`covered` 是对象）。`covered: true` 是另一回事（核心 F-9 补：包里的 MCP 服务全被自制的同名服务替代了，
-/// 认的那份也可能有），不算。
+/// 被上面一层盖住的那份：核心 SD-1补 起是 `shadowed` 对象（core1 11-05 改名），SD-1 时是 `covered` 对象，两种都认。`covered: true`
+/// 是另一回事（核心 F-9 补：包里的 MCP 服务全被自制的同名服务替代了，认的那份也可能有），不算。
 fn shadowed(item: &Value) -> bool {
-    item["covered"].is_object()
+    item["shadowed"].is_object() || item["covered"].is_object()
 }
 
 /// 开着没有：开关关着的（`enabled: false`）、卸掉了的出厂包、`status` 是关着、程序不在、缺依赖的不算；没有开关的（内置包）算开着。
