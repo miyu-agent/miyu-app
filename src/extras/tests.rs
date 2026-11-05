@@ -115,3 +115,20 @@ fn a_version_comes_from_the_listed_package_and_follows_changes() {
     packages.change(&json!({"package": "miyu-webui", "entry": null}));
     assert_eq!(packages.version("miyu-webui"), None);
 }
+
+#[test]
+fn a_package_covered_by_a_higher_layer_is_not_the_one_read() {
+    let mut packages = Packages::default();
+    // 核心 SD-1：认的那份在前，被盖住的接在后面、带 covered 对象；F-9 的 covered: true 不算被盖住
+    packages.replace(&json!({"packages": [
+        {"package": "miyu-webui", "layer": "home", "version": "0.2.0"},
+        {"package": "miyu-webui", "layer": "distro", "covered": {"by": "home", "version": "0.3.0", "over": "0.2.0", "newer": true}},
+        {"package": "kit", "layer": "home", "version": "1.0", "covered": true},
+    ]}));
+    assert_eq!(packages.version("miyu-webui").as_deref(), Some("0.2.0"));
+    assert_eq!(packages.version("kit").as_deref(), Some("1.0"));
+    // 推来被盖住那份的变动：认的那份不动
+    let changed = packages.change(&json!({"package": "miyu-webui", "entry": {"package": "miyu-webui", "layer": "distro", "covered": {"by": "home"}}}));
+    assert!(!changed);
+    assert_eq!(packages.version("miyu-webui").as_deref(), Some("0.2.0"));
+}

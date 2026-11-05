@@ -31,12 +31,14 @@ pub struct Packages {
 }
 
 impl Packages {
-    /// 订阅的回应：整份换掉。
+    /// 订阅的回应：整份换掉。同一个编号几层都有的（核心 SD-1），被上面一层盖住的那份也列着、带 `covered` 对象，只认没被盖住的
+    /// 那份（[`shadowed`]）。
     pub fn replace(&mut self, reply: &Value) {
         self.items = reply["packages"]
             .as_array()
             .into_iter()
             .flatten()
+            .filter(|item| !shadowed(item))
             .filter_map(|item| Some((item["package"].as_str()?.to_string(), item.clone())))
             .collect();
     }
@@ -48,6 +50,8 @@ impl Packages {
             return false;
         };
         match &params["entry"] {
+            // 被盖住的那份变了：托盘认的那份不动
+            entry if shadowed(entry) => false,
             Value::Null => self.items.remove(package).is_some(),
             entry => self
                 .items
@@ -77,6 +81,12 @@ impl Packages {
             })
             .collect()
     }
+}
+
+/// 被上面一层盖住的那份（核心 SD-1：`covered` 是对象）。`covered: true` 是另一回事（核心 F-9 补：包里的 MCP 服务全被自制的同名服务替代了，
+/// 认的那份也可能有），不算。
+fn shadowed(item: &Value) -> bool {
+    item["covered"].is_object()
 }
 
 /// 开着没有：开关关着的（`enabled: false`）、卸掉了的出厂包、`status` 是关着、程序不在、缺依赖的不算；没有开关的（内置包）算开着。
