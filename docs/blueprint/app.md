@@ -98,6 +98,14 @@
 | macOS | dmg，`Miyu.app`，`LSUIElement`（不占程序坞，只在菜单栏） | 「应用程序」里的 Miyu |
 | Linux | deb、rpm（AUR、Homebrew 的包由核心仓库的 `packaging/` 写，网页 `miyu-webui`、托盘 `miyu-applet` 各自成包，核心设计 60；2026-11-05 起托盘仓库不再带 PKGBUILD） | `miyu.desktop`（`Exec=miyu-applet`） |
 
+
+上面这几种都是完整的：带核心和网页，装上就能用（核心设计 59），和系统源的 `miyu-core` 写冲突。另出只装托盘的包（施工 AP-11，2026-11-05 core1，给系统源用：AUR 的 `miyu-applet` 依赖 `miyu-core`、`miyu-webui`，Homebrew 的 cask 依赖 formula 的 `miyu-core`、`miyu-webui`；不从源码编），进同一个发版：
+
+- Linux x86_64、aarch64：`miyu-applet-<版本>-linux-<架构>.tar.gz`（`packaging/solo.py`），一层 `miyu-applet-<版本>-linux-<架构>/` 照 `/usr` 摆：`bin/miyu-applet`、`share/applications/miyu-applet.desktop`、`share/icons/hicolor/{32x32,128x128,256x256}/apps/miyu-applet.png`、`share/licenses/miyu-applet/`（托盘自己的 `LICENSE`、第三方许可证清单）。
+- macOS：`miyu-applet-<版本>-macos-aarch64.zip`，里面是只装托盘的 `Miyu.app`（`packaging/macos-solo.json`：不带核心的程序和资源，`LSUIElement` 照旧，`Resources/licenses/` 托盘自己的两份）。
+- 托盘照 `PATH` 找系统装的 `miyu`；macOS 从访达、开机启动拉起的图形程序 `PATH` 只有 `/usr/bin:/bin:/usr/sbin:/sbin`，`PATH` 里也没有的再看 `/opt/homebrew/bin`、`/usr/local/bin`（`src/program.rs`）。完整的包里核心就在托盘旁边，先找到它，两种包不打架。
+- 发版附件另带 `SHA256SUMS`（全部附件）。和完整的包一样没签名。
+
 安装包里不再有网页视图，Linux 上不再要 WebKitGTK。
 
 实际做法（AP-5）：

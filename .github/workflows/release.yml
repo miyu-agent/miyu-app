@@ -1,6 +1,7 @@
 # 打安装包（施工 DT-6，图纸 app.md「装在哪」）：照 pins.toml 取核心、网页软件编 release，搭好内容，Tauri 的打包工具打包
 # （施工 AP-2 起程序不再是 Tauri 的，打包工具照旧用它的）；打完拆开三个平台的包核对装好的样子（施工 AP-5）。
-# step/ 分支、手动触发只打包、传到这次运行的附件里（出包手测）；打 v 开头的 tag 才建发版（预发布，没签名）。
+# step/ 分支、手动触发只打包、传到这次运行的附件里（出包手测）；打 v 开头的 tag 才建发版（预发布，没签名），附件带 SHA256SUMS。
+# 两种包：完整的（pack：带核心和网页，装上就能用，设计 59）、只装托盘的（solo：给系统源，设计 60，施工 AP-11）。
 # 第五批审计 D5-3：编、打包的任务只拿读权限，checkout 不把令牌留在磁盘上（核心、网页、tauri-cli 几百个依赖的构建脚本都在
 # 这个任务里跑）；只有最后传发版的小任务拿写权限，它不检出、不编东西。外部 action 按提交号钉，后面注明是哪个标签。
 name: 打包
@@ -198,9 +199,89 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # 只有这一步拿写权限：下三个平台的附件，建发版、传上去。不检出仓库、不跑别人的代码。
+  # 只装托盘的包（施工 AP-11，核心设计 60：AUR 的 miyu-applet、Homebrew 的 cask 用，依赖系统装的 miyu-core、miyu-webui）：不编核心、
+  # 网页，托盘照 PATH 找 miyu（macOS 另看 Homebrew 的前缀，src/program.rs）。Linux 两种架构的 tar.gz（packaging/solo.py），macOS 的
+  # .app 照 packaging/macos-solo.json 打（不带 externalBin、核心的资源），ditto 压成 zip。
+  solo:
+    permissions:
+      contents: read
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: linux-x86_64
+          - os: ubuntu-24.04-arm
+            target: linux-aarch64
+          - os: macos-latest
+            target: macos-aarch64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: 装托盘要的系统库
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev
+      - name: 装钉住的工具链
+        run: rustup toolchain install
+      - name: 取编译缓存
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' }}
+          add-rust-environment-hash-key: false
+          key: solo-${{ matrix.target }}
+      - name: 编托盘程序
+        run: cargo build --release --locked
+      - name: 打 tar.gz（Linux）
+        if: runner.os == 'Linux'
+        run: python3 packaging/solo.py --binary target/release/miyu-applet --target ${{ matrix.target }} --out out
+      - name: 拆开核对（Linux：只有托盘自己的几样，程序能跑）
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          tgz=$(ls out/*.tar.gz)
+          tar tzf "$tgz" | sed 's|^[^/]*/||' | grep -v '/$' | grep -v '^$' | sort > files.txt
+          cat files.txt
+          printf '%s\n' bin/miyu-applet share/applications/miyu-applet.desktop \
+            share/icons/hicolor/128x128/apps/miyu-applet.png share/icons/hicolor/256x256/apps/miyu-applet.png \
+            share/icons/hicolor/32x32/apps/miyu-applet.png share/licenses/miyu-applet/LICENSE \
+            share/licenses/miyu-applet/THIRD-PARTY-LICENSES.txt | sort > want.txt
+          diff want.txt files.txt
+          mkdir x && tar xzf "$tgz" -C x
+          file x/*/bin/miyu-applet
+          echo "只有托盘自己的几样"
+      - name: 打 .app 压 zip（macOS）
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          python3 packaging/solo.py --licenses dist-solo/licenses
+          cargo install tauri-cli --version =2.12.4 --locked
+          cargo tauri bundle --ci --config packaging/macos-solo.json
+          app=target/release/bundle/macos/Miyu.app
+          plutil -lint "$app/Contents/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :LSUIElement' "$app/Contents/Info.plist")" = true
+          ls "$app/Contents/MacOS"
+          test "$(ls "$app/Contents/MacOS")" = miyu-applet || { echo "MacOS 里不只托盘"; exit 1; }
+          test ! -e "$app/Contents/Resources/miyu" || { echo "带了核心的资源"; exit 1; }
+          test -s "$app/Contents/Resources/licenses/THIRD-PARTY-LICENSES.txt"
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          mkdir -p out
+          ditto -c -k --keepParent "$app" "out/miyu-applet-$version-macos-aarch64.zip"
+          ls -la out
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: miyu-applet-solo-${{ matrix.target }}
+          path: out/*
+          if-no-files-found: error
+          retention-days: 14
+
+  # 只有这一步拿写权限：下几个平台的附件，建发版、传上去，再出一份 SHA256SUMS。不检出仓库、不跑别人的代码。
   release:
-    needs: pack
+    needs: [pack, solo]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -226,4 +307,5 @@ jobs:
           tag="${GITHUB_REF#refs/tags/}"
           notes="$(printf '没签名的测试版。\n\n%s\n' "$(cat pins/pins.txt)")"
           gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --prerelease --title "Miyu $tag" --notes "$notes" || true
+          (cd out && sha256sum * > SHA256SUMS && cat SHA256SUMS)
           gh release upload "$tag" out/* --clobber

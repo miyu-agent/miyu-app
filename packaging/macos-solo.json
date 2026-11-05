@@ -1,0 +1,19 @@
+{
+  "bundle": {
+    "active": true,
+    "targets": [
+      "app"
+    ],
+    "category": "Utility",
+    "license": "AGPL-3.0-or-later",
+    "homepage": "https://github.com/miyu-agent/miyu-applet",
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "12.0",
+      "infoPlist": "packaging/macos/Info.plist",
+      "files": {
+        "Resources/licenses": "dist-solo/licenses"
+      }
+    }
+  }
+}

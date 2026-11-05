@@ -122,3 +122,14 @@ fn audit5_relative_path_entries_are_not_searched() {
     let got = locate(None, None, Some(path), |_| true);
     assert_eq!(got, Some(absolute.join(exe("miyu"))));
 }
+
+#[test]
+fn the_fallback_dirs_are_searched_in_order_after_the_path() {
+    let root = std::env::temp_dir();
+    let (a, b) = (root.join("fa"), root.join("fb"));
+    let (a, b) = (a.to_str().unwrap(), b.to_str().unwrap());
+    let wanted = Path::new(b).join(exe("miyu"));
+    assert_eq!(in_dirs(&[a, b], |p| p == wanted), Some(wanted.clone()));
+    assert_eq!(in_dirs(&[a, b], |_| false), None);
+    assert_eq!(in_dirs(&[], |_| true), None);
+}

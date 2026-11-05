@@ -57,7 +57,22 @@ pub fn locate(
         .find(|p| exists(p))
 }
 
-/// 照这个进程的环境找主程序。
+/// `PATH` 里也没有时再看的几个目录：macOS 从访达、开机启动拉起的图形程序，`PATH` 只有 `/usr/bin:/bin:/usr/sbin:/sbin`，Homebrew
+/// 装的 `miyu`（只装托盘的 `.app` 配 Homebrew 的 miyu-core，施工 AP-11）在它的前缀下。完整的安装包里核心就在托盘旁边，轮不到这里。
+#[cfg(target_os = "macos")]
+const FALLBACK_DIRS: &[&str] = &["/opt/homebrew/bin", "/usr/local/bin"];
+#[cfg(not(target_os = "macos"))]
+const FALLBACK_DIRS: &[&str] = &[];
+
+/// 在 `dirs` 里照先后找主程序。
+pub fn in_dirs(dirs: &[&str], exists: impl Fn(&Path) -> bool) -> Option<PathBuf> {
+    let name = format!("miyu{}", std::env::consts::EXE_SUFFIX);
+    dirs.iter()
+        .map(|dir| Path::new(dir).join(&name))
+        .find(|p| exists(p))
+}
+
+/// 照这个进程的环境找主程序：[`locate`]，都没有的再看 [`FALLBACK_DIRS`]。
 pub fn locate_here() -> Option<PathBuf> {
     let own = std::env::current_exe()
         .ok()
@@ -68,6 +83,7 @@ pub fn locate_here() -> Option<PathBuf> {
         std::env::var_os("PATH"),
         Path::is_file,
     )
+    .or_else(|| in_dirs(FALLBACK_DIRS, Path::is_file))
 }
 
 /// 调了一次，跑完了。
