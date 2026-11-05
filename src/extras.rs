@@ -56,6 +56,13 @@ impl Packages {
         }
     }
 
+    /// 装着的一个包的版本（`package.list` 那一项的 `version`）：核心照层挑好的那一份（出厂、系统加装、装上的，后面的同编号盖过
+    /// 前面的；核心设计 60）。没有这个包、没写版本的是 `None`。
+    pub fn version(&self, package: &str) -> Option<String> {
+        let version = self.items.get(package)?["version"].as_str()?.trim();
+        (!version.is_empty()).then(|| version.to_string())
+    }
+
     /// 托盘菜单该列的那几行，照编号排。
     pub fn entries(&self) -> Vec<Entry> {
         self.items

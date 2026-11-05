@@ -27,6 +27,7 @@ use serde_json::{Value, json};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
+use crate::about;
 use crate::alerts::Note;
 use crate::extras::{self, Entry, Packages};
 use crate::log;
@@ -52,6 +53,8 @@ pub enum Report {
     Packages(Vec<Entry>),
     /// 局域网开没开；`None` 是核心不认 `web.listen`（网页软件没装）。
     Lan(Option<bool>),
+    /// 核心用的网页包的版本（软件包列表里 `miyu-webui` 那一项；「关于」照它写）；`None` 是没装。
+    Web(Option<String>),
     /// 弹一条系统通知。
     Note(Note),
 }
@@ -214,6 +217,7 @@ async fn streams<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
             "package.changed" => {
                 let installed_or_removed = packages.change(&push["params"]);
                 report(Report::Packages(packages.entries()));
+                report(Report::Web(packages.version(about::WEB_PACKAGE)));
                 // 装卸包不推 `config.changed`：网页软件装上、卸掉了，`web.listen` 也跟着有没有。
                 if installed_or_removed {
                     read_lan(rpc, report, slow).await?;
@@ -278,6 +282,7 @@ async fn subscribe_packages<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
     )? {
         packages.replace(&reply);
         report(Report::Packages(packages.entries()));
+        report(Report::Web(packages.version(about::WEB_PACKAGE)));
     }
     Ok(())
 }

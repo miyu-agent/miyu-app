@@ -2,7 +2,10 @@
 //!
 //! - 托盘：这个程序编的时候的版本。
 //! - 核心：`miyu --version` 回的那一行。
-//! - 网页：资源目录里网页包清单的 `version`（打包时 `packaging/stage.py` 照网页仓库写进去的）。
+//! - 网页：核心软件包列表里 `miyu-webui` 那一项的版本（连着核心时托盘记着的，[`crate::link::Report::Web`]），就是核心真用的那一份：
+//!   出厂的、系统源加装的（`/usr/share/miyu/packages/`）、装上的（数据根 `opt/`），核心照层挑（核心设计 60，2026-11-05 core1：分包以后
+//!   核心的资源目录挪到 `/usr/lib/miyu/`，照资源目录读不到系统源装的网页）。没连上过核心的退回资源目录里网页包清单的 `version`
+//!   （打包时 `packaging/stage.py` 照网页仓库写进去的）。
 //! - 钉的提交号：`pins.toml` 编进程序，和打包流水线照着编核心、网页的是同一份。
 
 use std::path::Path;
@@ -10,8 +13,8 @@ use std::path::Path;
 use crate::program;
 use crate::text::{Text, key};
 
-/// 网页包的编号：资源目录 `packages/` 下它的文件夹名（`packaging/stage.py` 的 `WEB_PACKAGE`）。
-const WEB_PACKAGE: &str = "miyu-webui";
+/// 网页包的编号：软件包列表里它的 `package`，资源目录 `packages/` 下它的文件夹名（`packaging/stage.py` 的 `WEB_PACKAGE`）。
+pub const WEB_PACKAGE: &str = "miyu-webui";
 
 /// 钉的一样：仓库和提交号。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -95,8 +98,8 @@ pub fn describe(
     lines.join("\n")
 }
 
-/// 照这台机器找齐三样，拼好。要调一次 `miyu --version`，在后台线程里调。
-pub fn gather(text: &Text, miyu: Option<&Path>) -> String {
+/// 照这台机器找齐三样，拼好。`web` 是连着核心时记下的网页版本，没有的照资源目录找。要调一次 `miyu --version`，在后台线程里调。
+pub fn gather(text: &Text, miyu: Option<&Path>, web: Option<String>) -> String {
     let core =
         miyu.and_then(
             |miyu| match program::run(miyu, program::VERSION, program::VERSION_LIMIT) {
@@ -111,7 +114,7 @@ pub fn gather(text: &Text, miyu: Option<&Path>) -> String {
                 }
             },
         );
-    let web = web_manifest().as_deref().and_then(web_version);
+    let web = web.or_else(|| web_manifest().as_deref().and_then(web_version));
     describe(
         text,
         env!("CARGO_PKG_VERSION"),

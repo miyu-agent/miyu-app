@@ -69,6 +69,8 @@ pub struct App {
     open_at_start: Option<Page>,
     /// 在退了：别的事不再接。
     quitting: bool,
+    /// 核心用的网页包的版本（「关于」照它写）：连上过核心才有，断了留着上一次的。
+    web: Option<String>,
     asked: Once,
 }
 
@@ -93,6 +95,7 @@ impl App {
             toaster,
             open_at_start,
             quitting: false,
+            web: None,
             asked: Once::default(),
         }
     }
@@ -169,6 +172,10 @@ impl App {
                 self.toaster.show(note);
                 return;
             }
+            Report::Web(web) => {
+                self.web = web;
+                return;
+            }
         }
         self.redraw();
     }
@@ -212,7 +219,7 @@ impl App {
                 }
             }
             id::LOGS => actions::open_logs(&self.ctx),
-            id::ABOUT => actions::about(&self.ctx),
+            id::ABOUT => actions::about(&self.ctx, self.web.clone()),
             id::QUIT => {
                 log::line("quitting with the core");
                 self.quitting = true;

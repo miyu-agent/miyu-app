@@ -96,3 +96,22 @@ fn only_changes_to_the_listen_address_count() {
     assert!(!touches_listen(&json!({"ui.language": {}})));
     assert!(!touches_listen(&Value::Null));
 }
+
+#[test]
+fn a_version_comes_from_the_listed_package_and_follows_changes() {
+    let mut packages = Packages::default();
+    packages.replace(&json!({"packages": [
+        {"package": "miyu-webui", "version": "0.1.0", "layer": "home"},
+        {"package": "blank", "version": "  "},
+        {"package": "nameless"},
+    ]}));
+    assert_eq!(packages.version("miyu-webui").as_deref(), Some("0.1.0"));
+    assert_eq!(packages.version("blank"), None);
+    assert_eq!(packages.version("nameless"), None);
+    assert_eq!(packages.version("missing"), None);
+    // 换成另一层的那一份（核心照层挑好推来的）：照新的
+    packages.change(&json!({"package": "miyu-webui", "entry": {"package": "miyu-webui", "version": "0.2.0", "layer": "system"}}));
+    assert_eq!(packages.version("miyu-webui").as_deref(), Some("0.2.0"));
+    packages.change(&json!({"package": "miyu-webui", "entry": null}));
+    assert_eq!(packages.version("miyu-webui"), None);
+}

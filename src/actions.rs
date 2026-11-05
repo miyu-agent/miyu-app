@@ -210,11 +210,11 @@ pub fn open_logs(ctx: &Ctx) {
     });
 }
 
-/// 「关于 Miyu」。
-pub fn about(ctx: &Ctx) {
+/// 「关于 Miyu」：`web` 是连着核心时记下的网页版本。
+pub fn about(ctx: &Ctx, web: Option<String>) {
     let ctx = ctx.clone();
     background("about", move || {
-        let message = about::gather(&ctx.text, ctx.miyu.as_deref());
+        let message = about::gather(&ctx.text, ctx.miyu.as_deref(), web);
         let shown = rfd::MessageDialog::new()
             .set_title(ctx.text.get(key::ABOUT))
             .set_description(message)
