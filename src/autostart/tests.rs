@@ -6,25 +6,29 @@ use super::*;
 fn the_linux_file_follows_xdg_config_home() {
     assert_eq!(
         desktop_file(Some("/x/conf".into()), Some("/home/u".into())),
-        Some(PathBuf::from("/x/conf/autostart/miyu-app.desktop"))
+        Some(PathBuf::from("/x/conf/autostart/miyu-applet.desktop"))
     );
     assert_eq!(
         desktop_file(None, Some("/home/u".into())),
-        Some(PathBuf::from("/home/u/.config/autostart/miyu-app.desktop"))
+        Some(PathBuf::from(
+            "/home/u/.config/autostart/miyu-applet.desktop"
+        ))
     );
     // 相对的 XDG_CONFIG_HOME 不认（规范：只认绝对路径）。
     assert_eq!(
         desktop_file(Some("conf".into()), Some("/home/u".into())),
-        Some(PathBuf::from("/home/u/.config/autostart/miyu-app.desktop"))
+        Some(PathBuf::from(
+            "/home/u/.config/autostart/miyu-applet.desktop"
+        ))
     );
     assert_eq!(desktop_file(None, None), None);
 }
 
 #[test]
 fn the_desktop_entry_starts_the_tray_without_a_browser() {
-    let entry = desktop_entry(Path::new("/usr/bin/miyu-app"));
+    let entry = desktop_entry(Path::new("/usr/bin/miyu-applet"));
     assert!(entry.starts_with("[Desktop Entry]\n"));
-    assert!(entry.contains("\nExec=/usr/bin/miyu-app --autostart\n"));
+    assert!(entry.contains("\nExec=/usr/bin/miyu-applet --autostart\n"));
     assert!(entry.contains("\nType=Application\n"));
     assert!(entry.contains("\nName=Miyu\n"));
 }
@@ -32,11 +36,17 @@ fn the_desktop_entry_starts_the_tray_without_a_browser() {
 #[test]
 fn awkward_program_paths_are_quoted() {
     assert_eq!(
-        desktop_exec("/opt/My Apps/miyu-app"),
-        "\"/opt/My Apps/miyu-app\""
+        desktop_exec("/opt/My Apps/miyu-applet"),
+        "\"/opt/My Apps/miyu-applet\""
     );
-    assert_eq!(desktop_exec("/opt/$x/miyu-app"), "\"/opt/\\\\$x/miyu-app\"");
-    assert_eq!(desktop_exec("/opt/100%/miyu-app"), "/opt/100%%/miyu-app");
+    assert_eq!(
+        desktop_exec("/opt/$x/miyu-applet"),
+        "\"/opt/\\\\$x/miyu-applet\""
+    );
+    assert_eq!(
+        desktop_exec("/opt/100%/miyu-applet"),
+        "/opt/100%%/miyu-applet"
+    );
 }
 
 #[cfg(unix)]
@@ -45,7 +55,7 @@ fn the_launch_agent_file_is_in_the_home() {
     assert_eq!(
         launch_agent_file(Some("/Users/u".into())),
         Some(PathBuf::from(
-            "/Users/u/Library/LaunchAgents/io.github.miyu-agent.miyu-app.plist"
+            "/Users/u/Library/LaunchAgents/io.github.miyu-agent.miyu-applet.plist"
         ))
     );
     assert_eq!(launch_agent_file(None), None);
@@ -54,11 +64,11 @@ fn the_launch_agent_file_is_in_the_home() {
 #[test]
 fn the_launch_agent_runs_at_login_with_the_argument() {
     let plist = launch_agent(Path::new(
-        "/Applications/Miyu & Co.app/Contents/MacOS/miyu-app",
+        "/Applications/Miyu & Co.app/Contents/MacOS/miyu-applet",
     ));
-    assert!(plist.contains("<string>io.github.miyu-agent.miyu-app</string>"));
+    assert!(plist.contains("<string>io.github.miyu-agent.miyu-applet</string>"));
     assert!(plist.contains(
-        "<string>/Applications/Miyu &amp; Co.app/Contents/MacOS/miyu-app</string>\n    <string>--autostart</string>"
+        "<string>/Applications/Miyu &amp; Co.app/Contents/MacOS/miyu-applet</string>\n    <string>--autostart</string>"
     ));
     assert!(plist.contains("<key>RunAtLoad</key>\n  <true/>"));
 }
@@ -66,15 +76,15 @@ fn the_launch_agent_runs_at_login_with_the_argument() {
 #[test]
 fn the_run_value_quotes_the_program() {
     assert_eq!(
-        run_value(Path::new(r"C:\Program Files\Miyu\miyu-app.exe")),
-        r#""C:\Program Files\Miyu\miyu-app.exe" --autostart"#
+        run_value(Path::new(r"C:\Program Files\Miyu\miyu-applet.exe")),
+        r#""C:\Program Files\Miyu\miyu-applet.exe" --autostart"#
     );
 }
 
 #[test]
 fn removing_what_is_not_there_is_fine_and_writing_makes_the_folder() {
-    let dir = std::env::temp_dir().join(format!("miyu-app-autostart-{}", std::process::id()));
-    let file = dir.join("a").join("miyu-app.desktop");
+    let dir = std::env::temp_dir().join(format!("miyu-applet-autostart-{}", std::process::id()));
+    let file = dir.join("a").join("miyu-applet.desktop");
     remove(&file).unwrap();
     write(&file, "x").unwrap();
     assert_eq!(std::fs::read_to_string(&file).unwrap(), "x");

@@ -98,7 +98,7 @@ jobs:
       - name: 装 Tauri 的打包工具
         run: cargo install tauri-cli --version =2.12.4 --locked
       # 程序不再是 Tauri 的（施工 AP-2）：`cargo tauri build` 编的时候总要带 `tauri/custom-protocol` 这个特性，没有 tauri 依赖就编不过。
-      # 自己编 release，再只用它的打包（`tauri bundle` 照 mainBinaryName 找编好的 target/release/miyu-app）。
+      # 自己编 release，再只用它的打包（`tauri bundle` 照 mainBinaryName 找编好的 target/release/miyu-applet）。
       - name: 编托盘程序
         run: cargo build --release --locked
       - name: 打包
@@ -111,7 +111,6 @@ jobs:
           ls -la out
           test -n "$(ls out)"
       # 施工 AP-5：Tauri 的打包工具总给 deb、rpm 加 WebKitGTK 的依赖（关不掉），托盘不用网页视图，打完去掉；只改依赖，文件一个字节不动。
-      # 要在填 AUR 之前：PKGBUILD 的校验值照改完的 deb 算。
       - name: deb、rpm 去掉 WebKitGTK 的依赖
         if: runner.os == 'Linux'
         run: python3 packaging/drop-webkit.py out/*.deb out/*.rpm
@@ -132,7 +131,7 @@ jobs:
           # deb 里的路径写成 usr/…（Tauri 的打包工具不带 ./），也可能带 ./：都换成 /usr/…
           dpkg-deb -c "$deb" | awk '{print $NF}' | sed 's|^\./||; s|^|/|' > deb-files.txt
           rpm -qpl "$rpm" > rpm-files.txt
-          for f in licenses/README.txt licenses/miyu-app/LICENSE licenses/miyu-app/THIRD-PARTY-LICENSES.txt \
+          for f in licenses/README.txt licenses/miyu-applet/LICENSE licenses/miyu-applet/THIRD-PARTY-LICENSES.txt \
                    licenses/miyu/LICENSE licenses/miyu/THIRD-PARTY-LICENSES.txt licenses/miyu/LICENSES/Apache-2.0.txt \
                    licenses/miyu-web/LICENSE licenses/miyu-web/THIRD-PARTY-LICENSES.txt \
                    packages/miyu-webui/LICENSE packages/miyu-webui/THIRD-PARTY-LICENSES.txt; do
@@ -148,7 +147,7 @@ jobs:
             plist="$1/Contents/Info.plist"
             plutil -lint "$plist"
             test "$(/usr/libexec/PlistBuddy -c 'Print :LSUIElement' "$plist")" = true || { echo "$plist 里 LSUIElement 不是 true"; exit 1; }
-            for part in miyu-app miyu miyu-web; do
+            for part in miyu-applet miyu miyu-web; do
               test -s "$1/Contents/Resources/miyu/licenses/$part/THIRD-PARTY-LICENSES.txt" || { echo "$1 里没有 $part 的清单"; exit 1; }
             done
             echo "$1：LSUIElement = true，三份许可证都在"
@@ -170,35 +169,23 @@ jobs:
             $x = Join-Path $env:RUNNER_TEMP $msi.BaseName
             $run = Start-Process msiexec.exe -ArgumentList @('/a', "`"$($msi.FullName)`"", '/qn', "TARGETDIR=`"$x`"") -Wait -PassThru
             if ($run.ExitCode -ne 0) { throw "$($msi.Name)：msiexec /a 退出码 $($run.ExitCode)" }
-            $exe = Get-ChildItem $x -Recurse -Filter miyu-app.exe | Select-Object -First 1
-            if (-not $exe) { throw "$($msi.Name) 里没有 miyu-app.exe" }
+            $exe = Get-ChildItem $x -Recurse -Filter miyu-applet.exe | Select-Object -First 1
+            if (-not $exe) { throw "$($msi.Name) 里没有 miyu-applet.exe" }
             $root = $exe.DirectoryName
             $got = & (Join-Path $root 'resources\pwsh\pwsh.exe') -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion.ToString()'
             if ($got -ne $want) { throw "$($msi.Name)：带的 PowerShell 是 $got，pins.toml 是 $want" }
             $files = @('resources\pwsh\LICENSE.txt', 'resources\pwsh\ThirdPartyNotices.txt', 'resources\licenses\README.txt') +
-              (@('miyu-app', 'miyu', 'miyu-web') | ForEach-Object { "resources\licenses\$_\LICENSE", "resources\licenses\$_\THIRD-PARTY-LICENSES.txt" })
+              (@('miyu-applet', 'miyu', 'miyu-web') | ForEach-Object { "resources\licenses\$_\LICENSE", "resources\licenses\$_\THIRD-PARTY-LICENSES.txt" })
             foreach ($f in $files) { if (-not (Test-Path (Join-Path $root $f))) { throw "$($msi.Name) 里没有 $f" } }
             if (-not (Select-String -Quiet -Path (Join-Path $root 'resources\licenses\README.txt') -Pattern 'PowerShell')) { throw "licenses\README.txt 没提 PowerShell" }
             # 程序自己的版本信息（build.rs 和图标编在同一份资源里）：任务管理器照 FileDescription 写名字
             $info = $exe.VersionInfo
-            if ($info.FileDescription -ne 'Miyu' -or $info.ProductName -ne 'Miyu') { throw "miyu-app.exe 的名字是「$($info.FileDescription)」「$($info.ProductName)」" }
-            Write-Output "$($msi.Name)：PowerShell $got，许可证都在，miyu-app.exe 是 $($info.FileDescription) $($info.FileVersion)"
+            if ($info.FileDescription -ne 'Miyu' -or $info.ProductName -ne 'Miyu') { throw "miyu-applet.exe 的名字是「$($info.FileDescription)」「$($info.ProductName)」" }
+            Write-Output "$($msi.Name)：PowerShell $got，许可证都在，miyu-applet.exe 是 $($info.FileDescription) $($info.FileVersion)"
           }
-      - name: 填 AUR 的 PKGBUILD
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          deb=$(ls out/*.deb)
-          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
-          sum=$(sha256sum "$deb" | cut -d' ' -f1)
-          # 只换这两行（第五批审计 D5-7：原来连注释里的占位符也换了）；换完还有占位符的算错。
-          sed -e "s/^pkgver=@VERSION@\$/pkgver=$version/" -e "s/^sha256sums=('@SHA256@')\$/sha256sums=('$sum')/" packaging/aur/PKGBUILD.in > out/PKGBUILD
-          if grep -nE '@(VERSION|SHA256)@' out/PKGBUILD; then echo "PKGBUILD 里还有没填的占位符"; exit 1; fi
-          grep -qx "pkgver=$version" out/PKGBUILD
-          grep -qx "sha256sums=('$sum')" out/PKGBUILD
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: miyu-app-${{ runner.os }}
+          name: miyu-applet-${{ runner.os }}
           path: out/*
           if-no-files-found: error
           retention-days: 14
@@ -222,7 +209,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          pattern: miyu-app-*
+          pattern: miyu-applet-*
           merge-multiple: true
           path: out
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0

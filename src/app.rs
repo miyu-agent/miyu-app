@@ -276,7 +276,7 @@ fn start_log(ctx: &Ctx) {
     if let Some(logs) = ctx.root.as_ref().map(miyu_client::places::DataRoot::logs)
         && logs.is_dir()
     {
-        log::start(logs.join("miyu-app.log"));
+        log::start(logs.join("miyu-applet.log"));
         log::line(&format!(
             "logging here from now on, {}",
             env!("CARGO_PKG_VERSION")

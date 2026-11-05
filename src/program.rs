@@ -90,7 +90,7 @@ pub enum RunError {
     Timeout,
 }
 
-/// 托盘用的数据根（起来时定下，[`pin_home`]）：拉起的 `miyu` 都照它，带上 `MIYU_HOME`。点了通知照 `miyu-app:` 网址拉起的托盘，
+/// 托盘用的数据根（起来时定下，[`pin_home`]）：拉起的 `miyu` 都照它，带上 `MIYU_HOME`。点了通知照 `miyu-applet:` 网址拉起的托盘，
 /// 数据根是登记时写进去的（`protocol`），环境变量里没有，子进程不带上就会去默认的那一个。
 static HOME: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 

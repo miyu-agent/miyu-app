@@ -80,7 +80,7 @@ Windows only: PowerShell 7 is bundled in ../pwsh/ with its own LICENSE.txt (MIT)
 
 LICENSES_README = """Licenses of the software in this Miyu package.
 
-miyu-app/   the tray app (miyu-app): LICENSE (AGPL-3.0-or-later) and THIRD-PARTY-LICENSES.txt
+miyu-applet/   the tray app (miyu-applet): LICENSE (AGPL-3.0-or-later) and THIRD-PARTY-LICENSES.txt
 miyu/       the core (miyu, miyu-sandbox, miyu-extract and these resources): LICENSE (AGPL-3.0-or-later),
             LICENSES/ (Apache-2.0 for the parts listed in the core's README) and THIRD-PARTY-LICENSES.txt
 miyu-web/   the web app (packages/miyu-webui): LICENSE (AGPL-3.0-or-later) and THIRD-PARTY-LICENSES.txt
@@ -93,7 +93,7 @@ def stage_licenses(app, core, web, dest, windows):
     if dest.exists():
         sys.exit(f'核心的资源目录里已经有 {dest.name}/：先问核心的会话')
     parts = {
-        'miyu-app': (app, ['LICENSE', 'THIRD-PARTY-LICENSES.txt']),
+        'miyu-applet': (app, ['LICENSE', 'THIRD-PARTY-LICENSES.txt']),
         'miyu': (core, ['LICENSE', 'LICENSES', 'THIRD-PARTY-LICENSES.txt']),
         'miyu-web': (web, ['LICENSE', f'{WEB_PACKAGE}/THIRD-PARTY-LICENSES.txt']),
     }

@@ -1,6 +1,6 @@
-## Miyu 托盘程序（miyu-app）
+## Miyu 托盘程序（miyu-applet）
 
-Miyu 的托盘程序 `miyu-app`（2026-11-03 项目主人定，图纸 `docs/blueprint/app.md`，原来的窗口版外壳 `desktop.md` 留作历史）：只有托盘图标，没有窗口；界面都在网页里，托盘调主程序 `miyu web` 用浏览器打开。核心在 `miyu-agent/miyu`，网页在 `miyu-agent/miyu-web`；安装包把核心、网页软件和托盘程序打在一起，用哪一版钉在仓库里（`pins.toml`）。仓库 2026-11-03 从 `miyu-desktop` 改名。
+Miyu 的托盘程序 `miyu-applet`（2026-11-03 项目主人定，图纸 `docs/blueprint/app.md`，原来的窗口版外壳 `desktop.md` 留作历史）：只有托盘图标，没有窗口；界面都在网页里，托盘调主程序 `miyu web` 用浏览器打开。核心在 `miyu-agent/miyu`，网页在 `miyu-agent/miyu-web`；安装包把核心、网页软件和托盘程序打在一起，用哪一版钉在仓库里（`pins.toml`）。仓库 2026-11-03 从 `miyu-desktop` 改名。
 
 ### 规矩
 

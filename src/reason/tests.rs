@@ -4,7 +4,7 @@ use super::*;
 
 #[test]
 fn without_a_code_the_reason_is_kept() {
-    let root = DataRoot::at(std::env::temp_dir().join("miyu-app-reason-none"));
+    let root = DataRoot::at(std::env::temp_dir().join("miyu-applet-reason-none"));
     assert_eq!(say(None, "磁盘满了", &root, Lang::En), "磁盘满了");
 }
 

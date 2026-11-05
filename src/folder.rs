@@ -5,8 +5,8 @@ use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
 
-/// 托盘自己的目录在哪：Windows 是 `%LOCALAPPDATA%\miyu-app`，macOS 是 `~/Library/Application Support/miyu-app`，别的照 XDG 放在
-/// `$XDG_STATE_HOME/miyu-app`（没设的 `~/.local/state/miyu-app`）。只认绝对路径；找不到的交 `None`。不放进数据根：数据根第一次
+/// 托盘自己的目录在哪：Windows 是 `%LOCALAPPDATA%\miyu-applet`，macOS 是 `~/Library/Application Support/miyu-applet`，别的照 XDG 放在
+/// `$XDG_STATE_HOME/miyu-applet`（没设的 `~/.local/state/miyu-applet`）。只认绝对路径；找不到的交 `None`。不放进数据根：数据根第一次
 /// 由核心建，没建之前往里写东西，核心就认不出它了。
 pub fn own(
     os: &str,
@@ -26,7 +26,7 @@ pub fn own(
             None => home.and_then(absolute)?.join(".local").join("state"),
         },
     };
-    Some(base.join("miyu-app"))
+    Some(base.join("miyu-applet"))
 }
 
 /// 照这个进程的环境找托盘自己的目录。

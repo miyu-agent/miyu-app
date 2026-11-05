@@ -4,7 +4,8 @@ use std::path::PathBuf;
 
 /// 每个测试一个自己的空目录。
 fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("miyu-app-folder-{name}-{}", std::process::id()));
+    let dir =
+        std::env::temp_dir().join(format!("miyu-applet-folder-{name}-{}", std::process::id()));
     if dir.exists() {
         std::fs::remove_dir_all(&dir).unwrap();
     }
@@ -64,20 +65,20 @@ fn the_own_folder_follows_each_platform() {
     let home = Some(PathBuf::from("/home/u"));
     assert_eq!(
         own("linux", home.clone(), None, None),
-        Some(PathBuf::from("/home/u/.local/state/miyu-app"))
+        Some(PathBuf::from("/home/u/.local/state/miyu-applet"))
     );
     assert_eq!(
         own("linux", home.clone(), None, Some("/x/state".into())),
-        Some(PathBuf::from("/x/state/miyu-app"))
+        Some(PathBuf::from("/x/state/miyu-applet"))
     );
     assert_eq!(
         own("linux", home.clone(), None, Some("state".into())),
-        Some(PathBuf::from("/home/u/.local/state/miyu-app"))
+        Some(PathBuf::from("/home/u/.local/state/miyu-applet"))
     );
     assert_eq!(
         own("macos", home.clone(), None, None),
         Some(PathBuf::from(
-            "/home/u/Library/Application Support/miyu-app"
+            "/home/u/Library/Application Support/miyu-applet"
         ))
     );
     assert_eq!(own("linux", None, None, None), None);
@@ -89,7 +90,7 @@ fn the_own_folder_on_windows_needs_local_app_data() {
     let local = std::env::temp_dir();
     assert_eq!(
         own("windows", None, Some(local.clone().into_os_string()), None),
-        Some(local.join("miyu-app"))
+        Some(local.join("miyu-applet"))
     );
     assert_eq!(own("windows", Some(local), None, None), None);
 }

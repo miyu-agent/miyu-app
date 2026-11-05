@@ -9,7 +9,7 @@
     "shortDescription": "Miyu, an AI companion that works on your computer",
     "longDescription": "Miyu: a tray icon that starts and stops Miyu and opens the Miyu web interface in your browser. Includes the Miyu core and web app.",
     "license": "AGPL-3.0-or-later",
-    "homepage": "https://github.com/miyu-agent/miyu-app",
+    "homepage": "https://github.com/miyu-agent/miyu-applet",
     "externalBin": [
       "dist/binaries/miyu",
       "dist/binaries/miyu-sandbox",
@@ -24,7 +24,7 @@
         "files": {
           "/usr/share/miyu": "dist/resources"
         },
-        "desktopTemplate": "packaging/linux/miyu-app.desktop"
+        "desktopTemplate": "packaging/linux/miyu-applet.desktop"
       },
       "rpm": {
         "depends": [
@@ -34,9 +34,9 @@
         "files": {
           "/usr/share/miyu": "dist/resources"
         },
-        "desktopTemplate": "packaging/linux/miyu-app.desktop"
+        "desktopTemplate": "packaging/linux/miyu-applet.desktop"
       }
     }
   },
-  "productName": "miyu-app"
+  "productName": "miyu-applet"
 }

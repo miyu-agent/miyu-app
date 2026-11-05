@@ -6,24 +6,28 @@ const ID: &str = "01a1a520-30b6-702a-ada5-603e4d8a21e8";
 
 #[test]
 fn links_round_trip() {
-    assert_eq!(link(Some(ID)), format!("miyu-app://open/?session={ID}"));
+    assert_eq!(link(Some(ID)), format!("miyu-applet://open/?session={ID}"));
     assert_eq!(parse(&link(Some(ID))), Some(Some(ID.to_owned())));
-    assert_eq!(link(None), "miyu-app://open/");
+    assert_eq!(link(None), "miyu-applet://open/");
     assert_eq!(parse(&link(None)), Some(None));
-    assert_eq!(parse("miyu-app://open"), Some(None), "末尾没有斜杠的也认");
+    assert_eq!(
+        parse("miyu-applet://open"),
+        Some(None),
+        "末尾没有斜杠的也认"
+    );
 }
 
 #[test]
 fn strangers_are_refused() {
     assert_eq!(parse("http://open/?session=x"), None);
-    assert_eq!(parse("miyu-app://delete/"), None);
+    assert_eq!(parse("miyu-applet://delete/"), None);
     assert_eq!(
-        parse("miyu-app://open/?session=../../x"),
+        parse("miyu-applet://open/?session=../../x"),
         None,
         "编号写法不对"
     );
     assert_eq!(
-        parse("miyu-app://open/?session=01a1a520-30b6-702a-ada5-603e4d8a21e8&x=1"),
+        parse("miyu-applet://open/?session=01a1a520-30b6-702a-ada5-603e4d8a21e8&x=1"),
         None
     );
 }

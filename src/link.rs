@@ -34,7 +34,7 @@ use crate::log;
 use crate::rpc::{self, Failure, Rpc};
 
 /// 握手时报的头。
-pub const KIND: &str = "miyu-app";
+pub const KIND: &str = "miyu-applet";
 /// 文件一变不马上连：核心起来那几步（换令牌、听套接字、写位置）一连串，等它们落定。
 const SETTLE: Duration = Duration::from_millis(150);
 

@@ -1,4 +1,4 @@
-//! 编译期准备（施工 AP-5）：Windows 上把 Miyu 的图标和版本信息编进 `miyu-app.exe`，资源管理器、任务管理器、「属性」里看到的是
+//! 编译期准备（施工 AP-5）：Windows 上把 Miyu 的图标和版本信息编进 `miyu-applet.exe`，资源管理器、任务管理器、「属性」里看到的是
 //! Miyu 的图标和名字。原来是 `tauri-build` 编进去的，AP-2 去掉 Tauri 以后程序本身没有图标了（安装包、开始菜单的图标照旧由打包工具给）。
 //! 编给别的平台什么都不做：macOS、Linux 的图标在安装包里。
 
@@ -22,7 +22,7 @@ fn windows_resources() -> Result<(), String> {
     let icon = Path::new(&env("CARGO_MANIFEST_DIR")?)
         .join("icons")
         .join("icon.ico");
-    let script = Path::new(&env("OUT_DIR")?).join("miyu-app.rc");
+    let script = Path::new(&env("OUT_DIR")?).join("miyu-applet.rc");
     let version = [
         env("CARGO_PKG_VERSION_MAJOR")?,
         env("CARGO_PKG_VERSION_MINOR")?,
@@ -34,7 +34,7 @@ fn windows_resources() -> Result<(), String> {
         &env("CARGO_PKG_VERSION")?,
     );
     std::fs::write(&script, text).map_err(|e| format!("写不了 {}：{e}", script.display()))?;
-    embed_resource::compile_for(&script, ["miyu-app"], embed_resource::NONE)
+    embed_resource::compile_for(&script, ["miyu-applet"], embed_resource::NONE)
         .manifest_required()
         .map_err(|e| e.to_string())
 }
@@ -65,8 +65,8 @@ BEGIN
       VALUE "CompanyName", "miyu-agent"
       VALUE "FileDescription", "Miyu"
       VALUE "FileVersion", "{full}"
-      VALUE "InternalName", "miyu-app"
-      VALUE "OriginalFilename", "miyu-app.exe"
+      VALUE "InternalName", "miyu-applet"
+      VALUE "OriginalFilename", "miyu-applet.exe"
       VALUE "ProductName", "Miyu"
       VALUE "ProductVersion", "{full}"
     END

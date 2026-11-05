@@ -1,7 +1,7 @@
-//! 托盘自己的日志（图纸 `app.md` 第 6 条）：一行一条，写进数据根的 `var/log/miyu-app.log`，和核心、网页的日志放在一起（菜单
+//! 托盘自己的日志（图纸 `app.md` 第 6 条）：一行一条，写进数据根的 `var/log/miyu-applet.log`，和核心、网页的日志放在一起（菜单
 //! 「打开日志所在的文件夹」打开的就是那里）。只记起来、调 `miyu` 的结果和耗时、连核心的变化、退出。数据根的 `var/log/` 由核心建：
 //! 还没有的（核心没起过）先写到标准错误上，等连上核心再定下文件（[`start`] 只认第一次）。
-//! 文件到 1 MiB 挪成 `miyu-app.log.1`（只留一份旧的）；会一下来很多的事同一种一分钟只记一行（原来外壳第五批审计 D5-6）。
+//! 文件到 1 MiB 挪成 `miyu-applet.log.1`（只留一份旧的）；会一下来很多的事同一种一分钟只记一行（原来外壳第五批审计 D5-6）。
 
 use std::ffi::OsString;
 use std::fs::OpenOptions;
@@ -84,7 +84,7 @@ fn rotate(path: &Path, limit: u64) -> io::Result<()> {
     }
 }
 
-/// 旧的那一份：`miyu-app.log` → `miyu-app.log.1`。
+/// 旧的那一份：`miyu-applet.log` → `miyu-applet.log.1`。
 fn old(path: &Path) -> PathBuf {
     let mut name = OsString::from(path.as_os_str());
     name.push(".1");

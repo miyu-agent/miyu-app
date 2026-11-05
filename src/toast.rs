@@ -3,7 +3,7 @@
 //! 「打开」按钮）照 [`Toaster::new`] 给的回调打开那个会话。
 //!
 //! 三个平台做得到的不一样（关在这里，别处不分平台）：
-//! - Linux：图标是写进托盘自己目录的 logo（`notification.png`），带 `desktop-entry` 提示（`miyu-app`，同安装包的 `.desktop`）；同一个
+//! - Linux：图标是写进托盘自己目录的 logo（`notification.png`），带 `desktop-entry` 提示（`miyu-applet`，同安装包的 `.desktop`）；同一个
 //!   `tag` 的换掉上一条：记着每个 `tag` 上一条的编号，下一条带着它发（`replaces_id`）。点了是通知服务发回的 `ActionInvoked`
 //!   （默认动作 `default`）。
 //! - Windows：toast 照应用身份（AUMID）[`APP_ID`] 发，系统照开始菜单里带这个身份的快捷方式（Tauri 打包的 MSI 自带）写名字、画图标；
@@ -29,7 +29,7 @@ use crate::text::{Text, key};
 /// 应用身份：Tauri 打包配置的 `identifier`（`tauri.conf.json`）。Windows 安装包开始菜单的快捷方式带的 `System.AppUserModel.ID`
 /// 就是它（`tauri-bundler` 2.10.4 的 `main.wxs`），macOS 是 `Miyu.app` 的 `CFBundleIdentifier`。Linux 不用：通知服务照 `desktop-entry`。
 #[cfg(any(windows, target_os = "macos"))]
-const APP_ID: &str = "io.github.miyu-agent.miyu-app";
+const APP_ID: &str = "io.github.miyu-agent.miyu-applet";
 
 /// 点了通知：要打开的会话（账号级的提醒是 `None`，打开网页界面）。
 type OnClick = Box<dyn Fn(Option<String>) + Send + Sync>;
@@ -50,7 +50,7 @@ struct Shared {
         windows,
         expect(
             dead_code,
-            reason = "Windows 上点了通知照 miyu-app: 网址拉起托盘，不回调"
+            reason = "Windows 上点了通知照 miyu-applet: 网址拉起托盘，不回调"
         )
     )]
     on_click: OnClick,
@@ -86,7 +86,7 @@ impl Toaster {
     }
 }
 
-/// Windows：自己拼 toast（`winrt`），点了照 `miyu-app:` 网址拉起托盘、打开那个会话（`protocol`），不用回调。
+/// Windows：自己拼 toast（`winrt`），点了照 `miyu-applet:` 网址拉起托盘、打开那个会话（`protocol`），不用回调。
 #[cfg(windows)]
 fn show_now(shared: &Shared, note: &Note) {
     let body = shared.text.get(note.why.key());
@@ -221,7 +221,7 @@ mod platform {
         if let Some(icon) = icon.and_then(Path::to_str) {
             notification.icon(icon);
         }
-        notification.hint(Hint::DesktopEntry("miyu-app".to_owned()));
+        notification.hint(Hint::DesktopEntry("miyu-applet".to_owned()));
         if let Some(id) = replaces {
             notification.id(id);
         }

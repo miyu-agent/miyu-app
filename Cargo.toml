@@ -1,5 +1,5 @@
 [package]
-name = "miyu-app"
+name = "miyu-applet"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.97"
@@ -62,7 +62,7 @@ codegen-units = 1
 lto = true
 strip = true
 
-# Windows 上把 Miyu 的图标、版本信息编进 miyu-app.exe（build.rs，施工 AP-5）：只在编的时候用，不编进程序；编给别的平台时 build.rs 不调它。
+# Windows 上把 Miyu 的图标、版本信息编进 miyu-applet.exe（build.rs，施工 AP-5）：只在编的时候用，不编进程序；编给别的平台时 build.rs 不调它。
 [build-dependencies]
 embed-resource = "3.0.12"
 

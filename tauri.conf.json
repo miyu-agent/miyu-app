@@ -1,9 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Miyu",
-  "mainBinaryName": "miyu-app",
+  "mainBinaryName": "miyu-applet",
   "version": "0.1.0",
-  "identifier": "io.github.miyu-agent.miyu-app",
+  "identifier": "io.github.miyu-agent.miyu-applet",
   "build": {},
   "app": {
     "windows": [],

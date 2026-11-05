@@ -1,4 +1,4 @@
-//! Miyu 的托盘程序 `miyu-app`（图纸 `docs/blueprint/app.md`）：只有托盘图标（macOS 上是菜单栏图标），没有窗口。界面都在网页里，
+//! Miyu 的托盘程序 `miyu-applet`（图纸 `docs/blueprint/app.md`）：只有托盘图标（macOS 上是菜单栏图标），没有窗口。界面都在网页里，
 //! 托盘调装在旁边的主程序 `miyu` 用浏览器打开它；另照网页服务的样子连核心（不拉起），看它在不在跑。
 // 正式版不开控制台窗口（Windows）。
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -39,7 +39,7 @@ use crate::text::Text;
 fn main() {
     let text = Arc::new(Text::system());
     let autostarted = std::env::args().skip(1).any(|arg| arg == autostart::ARG);
-    // 点了通知拉起来的（`--open miyu-app://open/?session=<编号>`，`protocol`）：要打开的那个会话
+    // 点了通知拉起来的（`--open miyu-applet://open/?session=<编号>`，`protocol`）：要打开的那个会话
     let opened = protocol::from_args(std::env::args().skip(1));
     let mut problem = None;
     // 照网址拉起来的带着登记时的数据根（`--home`，`protocol`）：照它找，不照环境变量
@@ -63,7 +63,7 @@ fn main() {
     if let Some(logs) = root.as_ref().map(DataRoot::logs)
         && logs.is_dir()
     {
-        log::start(logs.join("miyu-app.log"));
+        log::start(logs.join("miyu-applet.log"));
     }
     log::line(&format!(
         "starting {}, autostarted: {autostarted}",
@@ -159,12 +159,14 @@ fn main() {
         None if autostarted => None,
         None => Some(actions::Page::Home),
     };
-    // Windows：点通知照 `miyu-app:` 网址拉起自己，每次起来照现在的位置登记一遍（`protocol`）
+    // Windows：点通知照 `miyu-applet:` 网址拉起自己，每次起来照现在的位置登记一遍（`protocol`）
     #[cfg(windows)]
     if let (Some(exe), Some(root)) = (std::env::current_exe().ok(), ctx.root.as_ref())
         && let Err(error) = protocol::register(&exe, root.path())
     {
-        log::line(&format!("could not register the miyu-app: links: {error}"));
+        log::line(&format!(
+            "could not register the miyu-applet: links: {error}"
+        ));
     }
     let mut app = App::new(ctx, toaster, open_at_start, problem);
     event_loop.run(move |event, _, control_flow| {

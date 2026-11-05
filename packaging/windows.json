@@ -7,7 +7,7 @@
     "category": "Utility",
     "publisher": "miyu-agent",
     "license": "AGPL-3.0-or-later",
-    "homepage": "https://github.com/miyu-agent/miyu-app",
+    "homepage": "https://github.com/miyu-agent/miyu-applet",
     "externalBin": [
       "dist/binaries/miyu",
       "dist/binaries/miyu-sandbox",

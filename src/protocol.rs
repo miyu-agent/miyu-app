@@ -1,12 +1,12 @@
-//! 点通知用的网址 `miyu-app://open/?session=<编号>`（AP-4 补，2026-11-04 Windows 虚拟机上测出来的）：Windows 上没打包的程序，通知收进
+//! 点通知用的网址 `miyu-applet://open/?session=<编号>`（AP-4 补，2026-11-04 Windows 虚拟机上测出来的）：Windows 上没打包的程序，通知收进
 //! 通知中心以后再点，系统不交回 `Activated`（要注册 COM 激活器，仓库不许 `unsafe`）。改成照网址激活：toast 的正文、「打开」按钮都写这个
-//! 网址，系统照当前用户注册表里登记的 `miyu-app` 拉起 `miyu-app.exe --open <网址>`；已经有托盘在跑的照单实例交给它（`instance::ask`
+//! 网址，系统照当前用户注册表里登记的 `miyu-applet` 拉起 `miyu-applet.exe --open <网址>`；已经有托盘在跑的照单实例交给它（`instance::ask`
 //! 带上会话），没在跑的这一个起来就打开那个会话。横幅上点、通知中心里点、托盘退了以后点都一样。
 //!
-//! 登记写在 `HKCU\Software\Classes\miyu-app`（不要管理员），每次起来照自己现在的位置写一遍；卸载时不删（同「开机时启动」的那一项）。
+//! 登记写在 `HKCU\Software\Classes\miyu-applet`（不要管理员），每次起来照自己现在的位置写一遍；卸载时不删（同「开机时启动」的那一项）。
 
 /// 网址的协议名。
-pub const SCHEME: &str = "miyu-app";
+pub const SCHEME: &str = "miyu-applet";
 
 /// 命令行上带网址的参数。
 pub const ARG: &str = "--open";
@@ -15,7 +15,7 @@ pub const ARG: &str = "--open";
 /// 数据根、交给同一个托盘（2026-11-04 虚拟机上测出：数据根照 `MIYU_HOME` 另指的，点了通知拉起来的去了默认的那一个）。
 pub const HOME_ARG: &str = "--home";
 
-/// 点了这条通知要去的网址：有会话的 `miyu-app://open/?session=<编号>`，账号级的提醒 `miyu-app://open/`。
+/// 点了这条通知要去的网址：有会话的 `miyu-applet://open/?session=<编号>`，账号级的提醒 `miyu-applet://open/`。
 pub fn link(session: Option<&str>) -> String {
     match session {
         Some(id) => format!("{SCHEME}://open/?session={id}"),
@@ -68,7 +68,7 @@ fn session_id(text: &str) -> bool {
             .all(|part| part.bytes().all(|b| b.is_ascii_hexdigit()))
 }
 
-/// 在当前用户的注册表里登记 `miyu-app` 协议，指到 `exe`、带上数据根 `home`：`"<exe>" --home "<数据根>" --open "%1"`。
+/// 在当前用户的注册表里登记 `miyu-applet` 协议，指到 `exe`、带上数据根 `home`：`"<exe>" --home "<数据根>" --open "%1"`。
 ///
 /// # Errors
 ///

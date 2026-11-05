@@ -166,7 +166,7 @@ fn hello_shows_the_local_token_and_says_it_is_the_tray() {
     let hello = hello("t0k", "zh_CN.UTF-8");
     assert_eq!(hello["token"], "t0k");
     assert_eq!(hello["protocol"], json!([1, 1]));
-    assert_eq!(hello["head"]["kind"], "miyu-app");
+    assert_eq!(hello["head"]["kind"], "miyu-applet");
     assert_eq!(hello["locale"], "zh_CN.UTF-8");
 }
 

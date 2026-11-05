@@ -1,4 +1,4 @@
-## Miyu 应用（miyu-app）
+## Miyu 应用（miyu-applet）
 
 状态：草案（施工 AP-1，2026-11-03；AP-2 托盘骨架、AP-3 托盘补全、AP-4 系统通知、AP-5 安装包收尾照实际做法改了几处，下面标了「AP-2」「AP-3」「AP-4」「AP-5」）。代替原来的桌面端外壳（`desktop.md`，Tauri 窗口，DT-1 到 DT-12）。
 
@@ -9,17 +9,17 @@
 - 开箱即用照旧：装上 → 从应用菜单打开 → 自动用浏览器打开网页 → 开始用。和窗口版只差打开的是浏览器。
 - 网页改了刷新就生效，不用重新出安装包；不再适配三种网页视图（WebKitGTK、WKWebView、WebView2），网页只照浏览器做。
 - 局域网访问、im 这些要在后台一直跑的，本来就要一个常驻的图标表示「Miyu 在后台跑着」，托盘正好是它。
-- 名字（同一天项目主人）：`-desktop` 是桌面版的意思，不合适，仓库、程序叫 `miyu-app`；给人看的地方（应用菜单、程序坞、任务栏、安装包、托盘提示）一律写「Miyu」，同 oMLX 只露一个名字。
+- 名字（同一天项目主人）：`-desktop` 是桌面版的意思，不合适，仓库、程序叫 `miyu-app`（2026-11-05 项目主人改名 `miyu-applet`：Linux 上托盘程序惯例叫 applet，如 nm-applet、blueman-applet；仓库 `miyu-agent/miyu-applet`，Windows AppID、macOS bundle id 是 `io.github.miyu-agent.miyu-applet`；还没发过正式版，不留清理旧名的代码）；给人看的地方（应用菜单、程序坞、任务栏、安装包、托盘提示）一律写「Miyu」，同 oMLX 只露一个名字。
 - 谁想做自己的桌面版、手机 App，照网页和协议自己做，不归这里。
 
 照 oMLX（README：原生菜单栏程序，只管起停、状态、崩溃了重启、更新、用量；界面都在服务给的网页里）：托盘不放界面，界面全在网页里。
 
 ### 它是什么
 
-一个常驻的小程序 `miyu-app`：只有托盘图标（macOS 上是菜单栏图标），没有窗口。它不连核心以外的东西，调装在旁边的主程序 `miyu`，另照网页的做法连核心，看状态、收提醒（第 4、5 条）。
+一个常驻的小程序 `miyu-applet`：只有托盘图标（macOS 上是菜单栏图标），没有窗口。它不连核心以外的东西，调装在旁边的主程序 `miyu`，另照网页的做法连核心，看状态、收提醒（第 4、5 条）。
 
-1. **从应用菜单打开**：起 `miyu-app`。已经有一个在跑的（单实例），交给它，它照第 2 条再开一次浏览器，自己退。
-   - 单实例按数据根算（AP-2）：`MIYU_HOME` 指到别处的托盘各跑各的。托盘自己的目录（Windows `%LOCALAPPDATA%\miyu-app`，macOS `~/Library/Application Support/miyu-app`，别的 `$XDG_STATE_HOME/miyu-app`，没设的 `~/.local/state/miyu-app`；只给自己看）里一把系统的文件锁、一个「请打开」的文件：拿到锁的盯着那个文件，拿不到的往里写一行就退。不放进数据根：数据根第一次由核心建，没建之前往里写东西核心就认不出它了。不用本机套接字：Linux 的抽象套接字谁都连得上、谁都能抢先占名字。
+1. **从应用菜单打开**：起 `miyu-applet`。已经有一个在跑的（单实例），交给它，它照第 2 条再开一次浏览器，自己退。
+   - 单实例按数据根算（AP-2）：`MIYU_HOME` 指到别处的托盘各跑各的。托盘自己的目录（Windows `%LOCALAPPDATA%\miyu-applet`，macOS `~/Library/Application Support/miyu-applet`，别的 `$XDG_STATE_HOME/miyu-applet`，没设的 `~/.local/state/miyu-applet`；只给自己看）里一把系统的文件锁、一个「请打开」的文件：拿到锁的盯着那个文件，拿不到的往里写一行就退。不放进数据根：数据根第一次由核心建，没建之前往里写东西核心就认不出它了。不用本机套接字：Linux 的抽象套接字谁都连得上、谁都能抢先占名字。
    - 开机拉起来的（带 `--autostart`）碰到已经在跑的，什么都不做就退。macOS 上点程序坞、再开一次（系统不起第二个，发「重新打开」）同样打开网页界面。
 2. **打开网页界面**：跑 `miyu web`（核心、网页服务没在跑的由它拉起；带交接票，经跳转页交给系统的浏览器，网页 `web-ui.md`「二、miyu web」）。起来那一下开一次；托盘菜单「打开网页界面」、点托盘图标（Windows、Linux 左键）再开。浏览器装成了应用（网页的应用清单，见「网页要配的」）的，系统照它开成独立窗口。
 3. **点托盘图标**：Windows、Linux 左键直接「打开网页界面」，右键出菜单；macOS 照菜单栏的习惯，点一下就出菜单。
@@ -65,8 +65,8 @@
        - 设没设访问密码：打开前现连现问，看握手回应的 `password_set`（核心参考 `connection.md`「hello」：头照它决定「允许局域网访问」开不开得了）；设过的才写，没设的、老核心不说的不写，改成 `miyu web --settings access`（网页 W-1085：开「通用」页、滚到「访问」那一组）。密码是在网页里设的，托盘收不到推送，所以不记着、每次点都问。
        - 「在手机上打开…」：`miyu web --settings access`（局域网地址、二维码在那一组）。
    - **这台电脑**：
-     - 「开机时启动」：打勾的开关（Windows 照当前用户的 `Run` 注册表项，值名 `Miyu`；macOS 照登录项 `SMAppService`；Linux 照 `~/.config/autostart/miyu-app.desktop`，照 `XDG_CONFIG_HOME`）。开机起来的带 `--autostart`，不开浏览器，只常驻。
-       - macOS 实际用的是用户的 LaunchAgent（`~/Library/LaunchAgents/io.github.miyu-agent.miyu-app.plist`，`RunAtLoad`，只在图形登录时起；AP-2）：`SMAppService` 要调 Objective-C 的接口（仓库 `forbid(unsafe_code)`），还要装成签过名的 `.app` 才认。系统设置的「登录项」里一样看得到、关得掉。
+     - 「开机时启动」：打勾的开关（Windows 照当前用户的 `Run` 注册表项，值名 `Miyu`；macOS 照登录项 `SMAppService`；Linux 照 `~/.config/autostart/miyu-applet.desktop`，照 `XDG_CONFIG_HOME`）。开机起来的带 `--autostart`，不开浏览器，只常驻。
+       - macOS 实际用的是用户的 LaunchAgent（`~/Library/LaunchAgents/io.github.miyu-agent.miyu-applet.plist`，`RunAtLoad`，只在图形登录时起；AP-2）：`SMAppService` 要调 Objective-C 的接口（仓库 `forbid(unsafe_code)`），还要装成签过名的 `.app` 才认。系统设置的「登录项」里一样看得到、关得掉。
        - 打勾照现在真的开着没有：点了照反过来设，设完再读一遍；设不成的弹一句。Linux 上文件里写了 `Hidden=true`（桌面环境的设置里关掉的）算关着。
      - 「打开日志所在的文件夹」：核心、网页、托盘的日志都在那里（数据根的 `var/log/`），出了问题照它查。还没有的（核心没起过）弹一句「还没有日志」，不替核心建。
    - **关于、退出**：
@@ -80,13 +80,13 @@
    - 写什么：同网页第 2、6 条：标题是会话的标题，没有的等核心起标题最多 5 秒，没等到照第一句（`preview`），定时任务的照那句话，再没有写「Miyu」；正文只写为什么，三种语言（`resources/text/` 的 `notify.*`，字同网页 `notify` 包）；`tag` 是 `<会话>:done`、`<会话>:ask`、`<会话>:approve`，定时任务跑完了同 `<会话>:done`，记录坏了是 `schedules.reset`。托盘发的都是没人开着的会话，不分出不出声，照系统默认。图标：Linux 用应用图标（写进托盘自己的目录给通知服务读），Windows、macOS 照应用身份用安装包的图标；不用会话人格的头像。
    - 点了：会话的 `miyu web --session <编号>`（网页 W-1085），账号级的 `miyu web`；旧网页不认参数（退出码 2）的退回 `miyu web`。通知上另有一个「打开」按钮，做的一样（macOS 要有按钮库才等人点）。
    - 用 `notify-rust` 4.18.2（钉死版本），三个平台做得到的不一样：
-     - Linux：会话 D-Bus 的 `org.freedesktop.Notifications`（zbus，同 ksni 那一套），带 `desktop-entry: miyu-app`；同一个 `tag` 的带上一条的编号发（`replaces_id`）换掉它；点了是通知服务发回的 `ActionInvoked`（默认动作 `default`）。没有通知服务的桌面不弹，只记日志。
-     - Windows：WinRT 的 toast，照应用身份（AUMID）`io.github.miyu-agent.miyu-app` 发，就是 MSI 开始菜单快捷方式上的 `System.AppUserModel.ID`（Tauri 打包工具 2.10.4 的模板自带，值是 `tauri.conf.json` 的 `identifier`）；系统照这个快捷方式写「Miyu」、画图标，没装（直接跑编出来的程序）的不一定弹得出来。toast 自己拼（`src/toast/winrt.rs`，`windows` 这个 crate 的 WinRT 接口，安全的 Rust），点了照网址拉起托盘（`src/protocol.rs`）。2026-11-04 Windows 虚拟机上测出：notify-rust 底下 tauri-winrt-notification 拼的 toast 只有「打开」按钮在横幅上时回得来，点正文、收进通知中心以后再点都回不来；改成在进程里接 `Activated` 也只管横幅，通知中心里点 Windows 只交给登记过的 COM 激活器（要 `unsafe`，不做）。现在：
-       - 正文、「打开」按钮都是 `activationType="protocol"`，网址 `miyu-app://open/?session=<编号>`（账号级的 `miyu-app://open/`）。托盘每次起来在当前用户的注册表登记 `miyu-app` 协议（`HKCU\Software\Classes\miyu-app`，不要管理员），命令是 `"<exe>" --home "<数据根>" --open "%1"`：照网址拉起的程序不带托盘的环境变量（`MIYU_HOME` 另指的数据根会丢），数据根写进命令里，起来照它找、`miyu` 子进程都带上 `MIYU_HOME`。
+     - Linux：会话 D-Bus 的 `org.freedesktop.Notifications`（zbus，同 ksni 那一套），带 `desktop-entry: miyu-applet`；同一个 `tag` 的带上一条的编号发（`replaces_id`）换掉它；点了是通知服务发回的 `ActionInvoked`（默认动作 `default`）。没有通知服务的桌面不弹，只记日志。
+     - Windows：WinRT 的 toast，照应用身份（AUMID）`io.github.miyu-agent.miyu-applet` 发，就是 MSI 开始菜单快捷方式上的 `System.AppUserModel.ID`（Tauri 打包工具 2.10.4 的模板自带，值是 `tauri.conf.json` 的 `identifier`）；系统照这个快捷方式写「Miyu」、画图标，没装（直接跑编出来的程序）的不一定弹得出来。toast 自己拼（`src/toast/winrt.rs`，`windows` 这个 crate 的 WinRT 接口，安全的 Rust），点了照网址拉起托盘（`src/protocol.rs`）。2026-11-04 Windows 虚拟机上测出：notify-rust 底下 tauri-winrt-notification 拼的 toast 只有「打开」按钮在横幅上时回得来，点正文、收进通知中心以后再点都回不来；改成在进程里接 `Activated` 也只管横幅，通知中心里点 Windows 只交给登记过的 COM 激活器（要 `unsafe`，不做）。现在：
+       - 正文、「打开」按钮都是 `activationType="protocol"`，网址 `miyu-applet://open/?session=<编号>`（账号级的 `miyu-applet://open/`）。托盘每次起来在当前用户的注册表登记 `miyu-applet` 协议（`HKCU\Software\Classes\miyu-applet`，不要管理员），命令是 `"<exe>" --home "<数据根>" --open "%1"`：照网址拉起的程序不带托盘的环境变量（`MIYU_HOME` 另指的数据根会丢），数据根写进命令里，起来照它找、`miyu` 子进程都带上 `MIYU_HOME`。
        - 拉起来的那一个照单实例：有托盘在跑的交「打开那个会话」（`session <编号>`），自己退；没在跑的起来就打开那个会话。横幅上、通知中心里、托盘退了以后点都一样。
        - 同一个 `tag` 的放进同一组（`Tag` 截到 64 个字、`Group` 是 `miyu`），下一条换掉上一条。卸载不删协议那一项（同「开机时启动」的注册表项）。
      - macOS：NSUserNotificationCenter（系统已经标成过时，还能用；新的 UNUserNotificationCenter 要签过名的 `.app`），照 `Miyu.app` 的 bundle id（同上）发，没装成 `.app` 的照库的默认用访达的身份。点了要等：带「打开」按钮的才等人点，点了通知本身或者按钮都打开那个会话；横幅收起以后在通知中心里再点，回不回得来要手测。不换掉上一条。
-6. **日志**：数据根 `var/log/` 下 `miyu-app.log`，和核心、网页的放在一起，照原来外壳 DT-10 的轮转和限流。数据根的 `var/log/` 由核心建：起来时还没有的先写到标准错误上，连上核心以后再定下文件（AP-2）。
+6. **日志**：数据根 `var/log/` 下 `miyu-applet.log`，和核心、网页的放在一起，照原来外壳 DT-10 的轮转和限流。数据根的 `var/log/` 由核心建：起来时还没有的先写到标准错误上，连上核心以后再定下文件（AP-2）。
 
 ### 装在哪
 
@@ -94,17 +94,17 @@
 
 | 平台 | 安装包 | 应用菜单里那一项 |
 |---|---|---|
-| Windows | 64 位 MSI（中、英、日），装进 `Program Files\Miyu\`，带官方 PowerShell 7 的 zip 版（DT-9）、许可证（DT-7） | 开始菜单「Miyu」，指向 `miyu-app.exe`（图形子系统，不闪命令行窗口） |
+| Windows | 64 位 MSI（中、英、日），装进 `Program Files\Miyu\`，带官方 PowerShell 7 的 zip 版（DT-9）、许可证（DT-7） | 开始菜单「Miyu」，指向 `miyu-applet.exe`（图形子系统，不闪命令行窗口） |
 | macOS | dmg，`Miyu.app`，`LSUIElement`（不占程序坞，只在菜单栏） | 「应用程序」里的 Miyu |
-| Linux | deb、rpm、AUR | `miyu.desktop`（`Exec=miyu-app`） |
+| Linux | deb、rpm（AUR、Homebrew 的包由核心仓库的 `packaging/` 写，网页 `miyu-webui`、托盘 `miyu-applet` 各自成包，核心设计 60；2026-11-05 起托盘仓库不再带 PKGBUILD） | `miyu.desktop`（`Exec=miyu-applet`） |
 
 安装包里不再有网页视图，Linux 上不再要 WebKitGTK。
 
 实际做法（AP-5）：
 
-- 许可证：托盘的第三方许可证清单 `THIRD-PARTY-LICENSES.txt` 在仓库根上（`cargo xtask notices` 生成，照网页仓库的做法；CI 的 `cargo xtask licenses` 查四个平台的依赖都能和 AGPL-3.0-or-later 合在一起发、清单是最新的）。安装包的资源目录下 `licenses/` 放三份：`miyu-app/`、`miyu/`（核心钉的那一版的 `LICENSE`、`LICENSES/`、清单）、`miyu-web/`，加一份 `README.txt`；网页包的文件夹照网页 `pack-web.py` 的样子带它自己的 `LICENSE` 和清单。装好以后 Linux 在 `/usr/share/miyu/licenses/`，Windows 在 `resources\licenses\`，macOS 在 `Miyu.app/Contents/Resources/miyu/licenses/`。
+- 许可证：托盘的第三方许可证清单 `THIRD-PARTY-LICENSES.txt` 在仓库根上（`cargo xtask notices` 生成，照网页仓库的做法；CI 的 `cargo xtask licenses` 查四个平台的依赖都能和 AGPL-3.0-or-later 合在一起发、清单是最新的）。安装包的资源目录下 `licenses/` 放三份：`miyu-applet/`、`miyu/`（核心钉的那一版的 `LICENSE`、`LICENSES/`、清单）、`miyu-web/`，加一份 `README.txt`；网页包的文件夹照网页 `pack-web.py` 的样子带它自己的 `LICENSE` 和清单。装好以后 Linux 在 `/usr/share/miyu/licenses/`，Windows 在 `resources\licenses\`，macOS 在 `Miyu.app/Contents/Resources/miyu/licenses/`。
 - PowerShell 7（只 Windows）：官方 zip 版，版本和两个 SHA256 钉在 `pins.toml` 的 `[pwsh]`（7.6.9，7.6 是 LTS），打包时下载、核对，解进资源目录的 `pwsh\`，核心先找它（核心 SW-5）；MSI 装卸前停进程的名单有它。
-- `miyu-app.exe` 的图标和名字：`build.rs` 编给 Windows 时用 `embed-resource` 把 `icons/icon.ico` 和版本信息（文件说明、产品名称「Miyu」）编进程序，资源管理器、任务管理器里是 Miyu 的图标和名字。release 照旧 `windows_subsystem = "windows"`（`src/main.rs`）。
+- `miyu-applet.exe` 的图标和名字：`build.rs` 编给 Windows 时用 `embed-resource` 把 `icons/icon.ico` 和版本信息（文件说明、产品名称「Miyu」）编进程序，资源管理器、任务管理器里是 Miyu 的图标和名字。release 照旧 `windows_subsystem = "windows"`（`src/main.rs`）。
 - macOS：`packaging/macos/Info.plist` 写 `LSUIElement = true`，经 `macos.json` 的 `infoPlist` 并进 `Miyu.app` 的 `Info.plist`；运行时另设 `Accessory`（AP-2）。
 - deb、rpm：Tauri 的打包工具总加 WebKitGTK 的依赖，打完由 `packaging/drop-webkit.py` 去掉（只改依赖，文件不动）；GTK 3、bubblewrap 照旧要。
 - 打包流水线拆开三个平台的包核对上面这些（`release.yml`「拆开核对」）。
@@ -120,7 +120,7 @@ core1 2026-11-03 答复：
 
 - 连核心不拉起：已经有了，`miyu-client` 的 `Core::connect_running(root, kind)`（`miyu core stop` 用的那个），托盘只用它，不用会拉起核心的连法。终端、网页服务、`miyu web` 照旧会拉起核心：托盘停着的时候别的头一连，核心就又起来了，这是对的（人在用），托盘照第 4 条的状态行跟着写「运行中」。托盘不在跑的时候怎么知道核心又起来了：看核心的锁文件（`run/core.lock`，系统的文件变动通知，不定时去问），一变就再 `connect_running` 一次。
   - AP-2 实际做法：盯整个 `run/`（不递归），里面有新建、改了、删了的就再连一次。光盯 `run/core.lock` 不够：锁文件本来就有的，核心起来时只是打开、拿锁，不改它，macOS、Windows 上不报；核心起来一定会换 `run/token`、写 `run/socket`。只是打开、读的不算（inotify 会报，托盘自己连核心时读令牌也会报）。`run/` 没有的盯数据根，数据根也没有的盯它的上一级。
-  - 连法同 `Core::connect_running`（`miyu-client` 的 `connect::connect`，加同一句 `hello`，`head.kind` 报 `miyu-app`），只是读的那一半托盘自己拿着、读到头就是断了：`Core` 只能一问一答（`call` 30 秒没回就当没回应），等不了「断了」。网页软件跟着配置的那条连接（网页 `follow.rs`）也是这样写的。以后核心门面给一个「等它断」的口子，换成它。断了马上再连一次：核心崩了、被叫停的连不上，报「已停止」；只是这条连接断了的接着连上。
+  - 连法同 `Core::connect_running`（`miyu-client` 的 `connect::connect`，加同一句 `hello`，`head.kind` 报 `miyu-applet`），只是读的那一半托盘自己拿着、读到头就是断了：`Core` 只能一问一答（`call` 30 秒没回就当没回应），等不了「断了」。网页软件跟着配置的那条连接（网页 `follow.rs`）也是这样写的。以后核心门面给一个「等它断」的口子，换成它。断了马上再连一次：核心崩了、被叫停的连不上，报「已停止」；只是这条连接断了的接着连上。
 - 「谁来发后台通知」的登记（第 5 条）：核心 TR-1。连接说一声「我来发」，断开就作废；别的头不用轮询也知道这时有没有人在发。形状（2026-11-03 合进核心 main `d58f7b099`，托盘这一步起钉的就是它）：托盘连上核心以后调 `notices.claim`（参数空，回 `{}`），之后订会话表和 `notices` 流来发（AP-4 做了，见第 5 条）。
 - `miyu web` 打开时直接到某个会话、设置页：核心不用动，`miyu web` 后面的参数原样转给网页包的 `open`，参数由网页定（网页 W-1085：`--session <编号>`、`--settings`）。
 - 软件包清单里的托盘入口（第 4 条「软件包挂的入口」）：核心 TR-2。清单新加一张表，名字分语言，只能指向本包自己的后台页，指别处报错；`package.list` 照装着的带出来。写法（同上，核心 main `d58f7b099`）：清单写 `[tray] name = {zh, en}`；`package.list` 和 packages 流里，有后台页又写了 `[tray]` 的包多一格 `"tray": {"name": "<照连接的语言挑好的>"}`；托盘照 `enabled`、`status` 只列开着的，点了跑 `miyu web --package <编号>`（AP-3 做了，见第 4 条）。
