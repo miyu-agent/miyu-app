@@ -13,6 +13,7 @@
 #
 #   python3 packaging/version.py --check                       换算的几个例子对不对
 #   python3 packaging/version.py --set 2026.11.0-rc.1          试打：改 Cargo.toml、Cargo.lock、tauri.conf.json 的版本（不提交）
+#   python3 packaging/version.py --tag v2026.11.0-rc.1         推标签时：正式标签要和 Cargo.toml 一样；演练标签照它改版本（同 --set）
 #   python3 packaging/version.py --overlay windows --out F     打包时多叠的一份 Tauri 配置（用不着的是 {}）
 #   python3 packaging/version.py --fix-deb out/*.deb           deb 的 Version 改成 ~ 的写法，文件名照 Cargo 的版本
 #   python3 packaging/version.py --expect deb|rpm|msi          包里该是什么版本（核对用）
@@ -109,6 +110,24 @@ def set_version(version):
     print(f'版本 {old} → {version}（Cargo.toml、Cargo.lock、tauri.conf.json）')
 
 
+def follow_tag(tag):
+    """推标签打包时（施工 AP-13，照核心 RL-2补2）：正式标签 v<版本> 要和 Cargo.toml 的一样，什么都不动；演练标签
+    v<年.月.序号>-rc.N 只在这台机器上把版本改成标签里的（不往 main 提交 rc 号）。Cargo.toml 已经是年.月.序号的，演练标签的
+    前半段也要和它一样；还是别的写法（现在的 0.1.0，等发版那天和核心一起定号）的不比。"""
+    version = cargo_version()
+    if tag == f'v{version}':
+        print(f'正式标签 {tag}：版本照 Cargo.toml 的 {version}')
+        return
+    m = re.match(r'^v((\d{4})\.(\d{1,2})\.(\d+))-rc\.(\d+)$', tag)
+    if not m or not CALENDAR.match(tag[1:]):
+        sys.exit(f'标签 {tag} 不对：要 v{version}（正式），或者 v<年.月.序号>-rc.N（演练）')
+    if CALENDAR.match(version) and split(version)[1] is None and m[1] != version:
+        sys.exit(f'演练标签 {tag} 和 Cargo.toml 的版本 {version} 对不上（要 v{version}-rc.N）')
+    wix(tag[1:])  # 年、月、rc 号的范围照 MSI 那一套查，不对的停下
+    print(f'演练标签 {tag}：版本临时改成 {tag[1:]}（只在这台机器上，不提交）')
+    set_version(tag[1:])
+
+
 def fix_deb(paths, version):
     """control 的 Version 换成 ~ 的写法；Tauri 照去掉预发布的版本起的文件名换成照 Cargo 的版本。"""
     want = deb(version)
@@ -154,6 +173,7 @@ def main():
     ap = argparse.ArgumentParser(description='发版的版本号换成各种安装包认的写法')
     ap.add_argument('--check', action='store_true', help='换算的几个例子对不对')
     ap.add_argument('--set', metavar='版本', help='试打：改 Cargo.toml、Cargo.lock、tauri.conf.json 的版本')
+    ap.add_argument('--tag', metavar='标签', help='推标签时：正式标签核对版本，演练标签照它改版本')
     ap.add_argument('--overlay', choices=['linux', 'macos', 'windows'], help='打包时多叠的一份 Tauri 配置')
     ap.add_argument('--out', help='--overlay 写到哪')
     ap.add_argument('--fix-deb', nargs='+', metavar='deb', help='deb 的 Version 改成 ~ 的写法')
@@ -163,6 +183,8 @@ def main():
         check()
     elif args.set:
         set_version(args.set)
+    elif args.tag:
+        follow_tag(args.tag)
     elif args.overlay:
         if not args.out:
             sys.exit('--overlay 要带 --out')

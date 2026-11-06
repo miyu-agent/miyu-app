@@ -50,7 +50,9 @@ jobs:
         run: |
           py=python3; "$py" --version > /dev/null 2>&1 || py=python
           "$py" packaging/version.py --check
-          if [ -n "$WANT" ]; then "$py" packaging/version.py --set "$WANT"; fi
+          if [ -n "$WANT" ]; then "$py" packaging/version.py --set "$WANT"
+          # 推标签：正式标签要和 Cargo.toml 一样，演练标签 v<年.月.序号>-rc.N 照它改版本、不提交（施工 AP-13，照核心 RL-2补2）
+          elif [ "$GITHUB_REF_TYPE" = tag ]; then "$py" packaging/version.py --tag "$GITHUB_REF_NAME"; fi
       - name: 读钉的版本
         id: pins
         shell: bash
@@ -269,7 +271,9 @@ jobs:
         run: |
           py=python3; "$py" --version > /dev/null 2>&1 || py=python
           "$py" packaging/version.py --check
-          if [ -n "$WANT" ]; then "$py" packaging/version.py --set "$WANT"; fi
+          if [ -n "$WANT" ]; then "$py" packaging/version.py --set "$WANT"
+          # 推标签：正式标签要和 Cargo.toml 一样，演练标签 v<年.月.序号>-rc.N 照它改版本、不提交（施工 AP-13，照核心 RL-2补2）
+          elif [ "$GITHUB_REF_TYPE" = tag ]; then "$py" packaging/version.py --tag "$GITHUB_REF_NAME"; fi
       - name: 装托盘要的系统库
         if: runner.os == 'Linux'
         run: |
@@ -355,6 +359,7 @@ jobs:
           ls -la out
           tag="${GITHUB_REF#refs/tags/}"
           notes="$(printf '没签名的测试版。\n\n%s\n' "$(cat pins/pins.txt)")"
-          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --prerelease --title "Miyu $tag" --notes "$notes" || true
+          # 预发布、不设成最新的（施工 AP-13：演练的托盘发布不顶掉以后的正式版）
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --prerelease --latest=false --title "Miyu $tag" --notes "$notes" || true
           (cd out && sha256sum * > SHA256SUMS && cat SHA256SUMS)
           gh release upload "$tag" out/* --clobber

@@ -126,7 +126,7 @@
 | rpm | 版本去掉预发布、发布号写 `0.rc.N`：`2026.11.0-0.rc.1`；正式版发布号照旧 `1` | Tauri 用的 rpm 库不收带 `-` 的版本，`~` 又写不进 Tauri 的配置；照 Fedora 原来的预发布写法，`0.rc.1` 排在 `1` 前面 |
 | dmg、只装托盘的 tar.gz、zip | 原样 | 不走 App Store、不自动更新，排不排得对用不着（2026-11-06 core1：dmg 先不动） |
 
-不是这种写法的版本（现在的 `0.1.0`）都照原样。AUR 的 `pkgver`（`2026.11.0rc1`）由核心仓库的 `packaging/` 写（核心 VR-1）。试打：手动触发「打包」时填「试打用的版本号」，只在那一次运行里改 `Cargo.toml`、`Cargo.lock`、`tauri.conf.json`，不提交。
+不是这种写法的版本（现在的 `0.1.0`）都照原样。AUR 的 `pkgver`（`2026.11.0rc1`）由核心仓库的 `packaging/` 写（核心 VR-1）。试打：手动触发「打包」时填「试打用的版本号」，只在那一次运行里改 `Cargo.toml`、`Cargo.lock`、`tauri.conf.json`，不提交。推标签（施工 AP-13，照核心 RL-2补2）：正式标签 `v<版本>` 要和 `Cargo.toml` 的一样；演练标签 `v<年.月.序号>-rc.N` 照它在 CI 机器上改版本（同试打），不往 main 提交 rc 号；`Cargo.toml` 已经是年.月.序号的，演练标签的前半段也要和它一样。发布一律是预发布、不设成最新的；核心的 `cargo xtask packaging --applet` 照这个发布的 `SHA256SUMS` 和 `miyu-applet-<版本>-linux-<架构>.tar.gz`、`-macos-aarch64.zip` 填 AUR、Homebrew 的托盘包（核心 RL-5补）。
 
 ### 网页要配的
 
