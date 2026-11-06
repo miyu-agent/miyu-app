@@ -23,7 +23,7 @@ CALENDAR = re.compile(r'^(\d{4})\.(\d{1,2})\.(\d+)(?:-rc\.(\d+))?$')
 
 
 def cargo_version():
-    return tomllib.loads((ROOT / 'Cargo.toml').read_text())['package']['version']
+    return tomllib.loads((ROOT / 'Cargo.toml').read_text(encoding='utf-8'))['package']['version']
 
 
 def split(version):
@@ -92,19 +92,20 @@ def set_version(version):
     """试打用：三处的版本换成 `version`，不提交。"""
     old = cargo_version()
     cargo = ROOT / 'Cargo.toml'
-    text = cargo.read_text()
+    text = cargo.read_text(encoding='utf-8')
     head = re.search(r'^\[package\]\n(?:.*\n)*?version = "[^"]*"', text, re.M)
-    cargo.write_text(text[:head.start()] + re.sub(r'version = "[^"]*"$', f'version = "{version}"', head.group(0)) + text[head.end():])
+    text = text[:head.start()] + re.sub(r'version = "[^"]*"$', f'version = "{version}"', head.group(0)) + text[head.end():]
+    cargo.write_text(text, encoding='utf-8', newline='\n')
     lock = ROOT / 'Cargo.lock'
-    text, n = re.subn(rf'(\[\[package\]\]\nname = "miyu-applet"\nversion = )"{re.escape(old)}"', rf'\1"{version}"', lock.read_text())
+    text, n = re.subn(rf'(\[\[package\]\]\nname = "miyu-applet"\nversion = )"{re.escape(old)}"', rf'\1"{version}"', lock.read_text(encoding='utf-8'))
     if n != 1:
         sys.exit('Cargo.lock 里找不到 miyu-applet 那一项')
-    lock.write_text(text)
+    lock.write_text(text, encoding='utf-8', newline='\n')
     conf = ROOT / 'tauri.conf.json'
-    text, n = re.subn(r'("version": )"[^"]*"', rf'\1"{version}"', conf.read_text(), count=1)
+    text, n = re.subn(r'("version": )"[^"]*"', rf'\1"{version}"', conf.read_text(encoding='utf-8'), count=1)
     if n != 1:
         sys.exit('tauri.conf.json 里没有 version')
-    conf.write_text(text)
+    conf.write_text(text, encoding='utf-8', newline='\n')
     print(f'版本 {old} → {version}（Cargo.toml、Cargo.lock、tauri.conf.json）')
 
 
@@ -147,6 +148,9 @@ def fix_deb(paths, version):
 
 
 def main():
+    # Windows 的控制台默认 cp1252，中文打不出来（2026-11-06 打包流水线在 Windows 上挂在这里）
+    for stream in (sys.stdout, sys.stderr):
+        stream.reconfigure(encoding='utf-8')
     ap = argparse.ArgumentParser(description='发版的版本号换成各种安装包认的写法')
     ap.add_argument('--check', action='store_true', help='换算的几个例子对不对')
     ap.add_argument('--set', metavar='版本', help='试打：改 Cargo.toml、Cargo.lock、tauri.conf.json 的版本')
@@ -163,7 +167,7 @@ def main():
         if not args.out:
             sys.exit('--overlay 要带 --out')
         data = overlay(args.overlay, cargo_version())
-        pathlib.Path(args.out).write_text(json.dumps(data, ensure_ascii=False) + '\n')
+        pathlib.Path(args.out).write_text(json.dumps(data, ensure_ascii=False) + '\n', encoding='utf-8', newline='\n')
         print(f'{args.out}：{json.dumps(data, ensure_ascii=False)}')
     elif args.fix_deb:
         fix_deb(args.fix_deb, cargo_version())
