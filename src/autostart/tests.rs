@@ -26,7 +26,7 @@ fn the_linux_file_follows_xdg_config_home() {
 
 #[test]
 fn the_desktop_entry_starts_the_tray_without_a_browser() {
-    let entry = desktop_entry(Path::new("/usr/bin/miyu-applet"));
+    let entry = desktop_entry(Path::new("/usr/bin/miyu-applet"), None);
     assert!(entry.starts_with("[Desktop Entry]\n"));
     assert!(entry.contains("\nExec=/usr/bin/miyu-applet --autostart\n"));
     assert!(entry.contains("\nType=Application\n"));
@@ -63,14 +63,42 @@ fn the_launch_agent_file_is_in_the_home() {
 
 #[test]
 fn the_launch_agent_runs_at_login_with_the_argument() {
-    let plist = launch_agent(Path::new(
-        "/Applications/Miyu & Co.app/Contents/MacOS/miyu-applet",
-    ));
+    let plist = launch_agent(
+        Path::new("/Applications/Miyu & Co.app/Contents/MacOS/miyu-applet"),
+        None,
+    );
     assert!(plist.contains("<string>io.github.miyu-agent.miyu-applet</string>"));
     assert!(plist.contains(
         "<string>/Applications/Miyu &amp; Co.app/Contents/MacOS/miyu-applet</string>\n    <string>--autostart</string>"
     ));
     assert!(plist.contains("<key>RunAtLoad</key>\n  <true/>"));
+}
+
+/// 托盘照别的数据根起的（施工 AP-14）：开机也照它起；默认的那几项不加。
+#[test]
+fn a_data_root_set_at_start_goes_into_the_login_item() {
+    let entry = desktop_entry(
+        Path::new("/home/u/.local/lib/miyu-applet/bin/miyu-applet"),
+        Some(Path::new("/home/u/.cache/miyu home")),
+    );
+    assert!(entry.contains(
+        "\nExec=env \"MIYU_HOME=/home/u/.cache/miyu home\" /home/u/.local/lib/miyu-applet/bin/miyu-applet --autostart\n"
+    ));
+    assert!(!desktop_entry(Path::new("/usr/bin/miyu-applet"), None).contains("MIYU_HOME"));
+    let plist = launch_agent(
+        Path::new("/Applications/Miyu.app/Contents/MacOS/miyu-applet"),
+        Some(Path::new("/Users/u/Miyu & data")),
+    );
+    assert!(plist.contains(
+        "<key>EnvironmentVariables</key>\n  <dict>\n    <key>MIYU_HOME</key>\n    <string>/Users/u/Miyu &amp; data</string>\n  </dict>"
+    ));
+    assert!(
+        !launch_agent(
+            Path::new("/Applications/Miyu.app/Contents/MacOS/miyu-applet"),
+            None
+        )
+        .contains("EnvironmentVariables")
+    );
 }
 
 #[test]

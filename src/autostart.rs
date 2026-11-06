@@ -7,6 +7,10 @@
 //! - Linux：`~/.config/autostart/miyu-applet.desktop`（XDG 自动启动）。
 //!
 //! 写什么、写在哪是纯的函数，单测钉住；真去读写的那几行按平台分开。
+//!
+//! 托盘是照 `MIYU_HOME` 指的数据根起来的（施工 AP-14，2026-11-07：装来试用时数据根不在默认的 `~/.miyu`），开机也照它起：Linux 的
+//! `Exec` 前面加 `env MIYU_HOME=…`，macOS 的 LaunchAgent 写进 `EnvironmentVariables`；没设的照默认，什么都不加。Windows 的 `Run`
+//! 项只能写一行命令、带不了环境变量，照旧（开机照默认的数据根）。
 
 use std::ffi::OsString;
 use std::io;
@@ -31,10 +35,17 @@ pub fn enabled() -> bool {
 /// 找不到自己在哪、家目录在哪，写不了、删不了。
 pub fn set(on: bool) -> io::Result<()> {
     if on {
-        sys::enable(&std::env::current_exe()?)
+        sys::enable(&std::env::current_exe()?, data_root().as_deref())
     } else {
         sys::disable()
     }
+}
+
+/// 托盘照哪个数据根起的：设了 `MIYU_HOME`、是绝对路径的那一个；没设的交 `None`（照默认）。
+fn data_root() -> Option<PathBuf> {
+    std::env::var_os("MIYU_HOME")
+        .map(PathBuf::from)
+        .filter(|root| root.is_absolute())
 }
 
 /// Linux 上那个文件：`$XDG_CONFIG_HOME/autostart/miyu-applet.desktop`，没设（或者不是绝对路径）的照 `~/.config`。
@@ -48,12 +59,18 @@ pub fn desktop_file(config_home: Option<OsString>, home: Option<PathBuf>) -> Opt
     Some(config.join("autostart").join("miyu-applet.desktop"))
 }
 
-/// Linux 的自动启动文件（XDG Desktop Entry）。
+/// Linux 的自动启动文件（XDG Desktop Entry）。`root` 是托盘起来时的数据根（`MIYU_HOME`），有的照 `env` 带上。
 #[cfg_attr(target_os = "macos", allow(dead_code, reason = "macOS、Windows 不用"))]
 #[cfg_attr(windows, allow(dead_code, reason = "macOS、Windows 不用"))]
-pub fn desktop_entry(exe: &Path) -> String {
+pub fn desktop_entry(exe: &Path, root: Option<&Path>) -> String {
+    let env = root.map_or_else(String::new, |root| {
+        format!(
+            "env {} ",
+            desktop_exec(&format!("MIYU_HOME={}", root.to_string_lossy()))
+        )
+    });
     format!(
-        "[Desktop Entry]\nType=Application\nName=Miyu\nExec={} {ARG}\nIcon=miyu-applet\nTerminal=false\nNoDisplay=true\nX-GNOME-Autostart-enabled=true\n",
+        "[Desktop Entry]\nType=Application\nName=Miyu\nExec={env}{} {ARG}\nIcon=miyu-applet\nTerminal=false\nNoDisplay=true\nX-GNOME-Autostart-enabled=true\n",
         desktop_exec(&exe.to_string_lossy())
     )
 }
@@ -92,9 +109,15 @@ pub fn launch_agent_file(home: Option<PathBuf>) -> Option<PathBuf> {
     )
 }
 
-/// macOS 的 LaunchAgent：登录到图形界面时拉起一次。
+/// macOS 的 LaunchAgent：登录到图形界面时拉起一次。`root` 是托盘起来时的数据根（`MIYU_HOME`），有的写进 `EnvironmentVariables`。
 #[cfg_attr(not(target_os = "macos"), allow(dead_code, reason = "只有 macOS 用"))]
-pub fn launch_agent(exe: &Path) -> String {
+pub fn launch_agent(exe: &Path, root: Option<&Path>) -> String {
+    let env = root.map_or_else(String::new, |root| {
+        format!(
+            "  <key>EnvironmentVariables</key>\n  <dict>\n    <key>MIYU_HOME</key>\n    <string>{}</string>\n  </dict>\n",
+            xml_escape(&root.to_string_lossy())
+        )
+    });
     format!(
         concat!(
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n",
@@ -102,6 +125,7 @@ pub fn launch_agent(exe: &Path) -> String {
             "<plist version=\"1.0\">\n<dict>\n",
             "  <key>Label</key>\n  <string>{label}</string>\n",
             "  <key>ProgramArguments</key>\n  <array>\n    <string>{exe}</string>\n    <string>{arg}</string>\n  </array>\n",
+            "{env}",
             "  <key>RunAtLoad</key>\n  <true/>\n",
             "  <key>LimitLoadToSessionType</key>\n  <string>Aqua</string>\n",
             "  <key>ProcessType</key>\n  <string>Interactive</string>\n",
@@ -110,6 +134,7 @@ pub fn launch_agent(exe: &Path) -> String {
         label = LABEL,
         exe = xml_escape(&exe.to_string_lossy()),
         arg = ARG,
+        env = env,
     )
 }
 
@@ -166,7 +191,8 @@ mod sys {
             .is_ok()
     }
 
-    pub fn enable(exe: &Path) -> io::Result<()> {
+    /// `Run` 项带不了环境变量：开机照默认的数据根（见开头）。
+    pub fn enable(exe: &Path, _root: Option<&Path>) -> io::Result<()> {
         let (key, _) = RegKey::predef(HKEY_CURRENT_USER).create_subkey(RUN)?;
         key.set_value(NAME, &run_value(exe))
     }
@@ -194,8 +220,8 @@ mod sys {
         file().is_ok_and(|file| file.is_file())
     }
 
-    pub fn enable(exe: &Path) -> io::Result<()> {
-        write(&file()?, &launch_agent(exe))
+    pub fn enable(exe: &Path, root: Option<&Path>) -> io::Result<()> {
+        write(&file()?, &launch_agent(exe, root))
     }
 
     pub fn disable() -> io::Result<()> {
@@ -220,8 +246,8 @@ mod sys {
             .is_ok_and(|text| !text.lines().any(|line| line.trim() == "Hidden=true"))
     }
 
-    pub fn enable(exe: &Path) -> io::Result<()> {
-        write(&file()?, &desktop_entry(exe))
+    pub fn enable(exe: &Path, root: Option<&Path>) -> io::Result<()> {
+        write(&file()?, &desktop_entry(exe, root))
     }
 
     pub fn disable() -> io::Result<()> {
