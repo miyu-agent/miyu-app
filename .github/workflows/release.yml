@@ -13,6 +13,11 @@ on:
     # 只改文档的不重新打包（tag 照打）。
     paths-ignore: ["docs/**", "**/*.md"]
   workflow_dispatch:
+    inputs:
+      version:
+        description: 试打用的版本号（例如 2026.11.0-rc.1）：只在这次运行里改，不提交；不写照 Cargo.toml
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -37,6 +42,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # 施工 AP-12：版本号换成各种安装包认的写法（packaging/version.py 开头）；手动触发带了版本号的照它试打。
+      - name: 版本号
+        shell: bash
+        env:
+          WANT: ${{ inputs.version }}
+        run: |
+          py=python3; "$py" --version > /dev/null 2>&1 || py=python
+          "$py" packaging/version.py --check
+          if [ -n "$WANT" ]; then "$py" packaging/version.py --set "$WANT"; fi
       - name: 读钉的版本
         id: pins
         shell: bash
@@ -103,7 +117,11 @@ jobs:
       - name: 编托盘程序
         run: cargo build --release --locked
       - name: 打包
-        run: cargo tauri bundle --ci --config ${{ matrix.config }}
+        shell: bash
+        run: |
+          py=python3; "$py" --version > /dev/null 2>&1 || py=python
+          "$py" packaging/version.py --overlay "$(echo "$RUNNER_OS" | tr A-Z a-z)" --out "$RUNNER_TEMP/version.json"
+          cargo tauri bundle --ci --config ${{ matrix.config }} --config "$RUNNER_TEMP/version.json"
       - name: 收安装包
         shell: bash
         run: |
@@ -115,6 +133,9 @@ jobs:
       - name: deb、rpm 去掉 WebKitGTK 的依赖
         if: runner.os == 'Linux'
         run: python3 packaging/drop-webkit.py out/*.deb out/*.rpm
+      - name: deb 的版本写成 ~ 的（预发布）
+        if: runner.os == 'Linux'
+        run: python3 packaging/version.py --fix-deb out/*.deb
       # 施工 AP-5：拆开装好的样子核对，不只看打没打出来。列表先存成文件再找：管道里 grep -q 找到就退，前面的会挨 SIGPIPE。
       - name: 拆开核对（Linux：依赖没有 WebKitGTK、三份许可证）
         if: runner.os == 'Linux'
@@ -124,6 +145,12 @@ jobs:
           dpkg-deb -f "$deb" Depends | tr ',' '\n' | sed 's/^ *//' > deb-depends.txt
           rpm -qpR "$rpm" | sed 's/ *$//' > rpm-requires.txt
           echo "deb Depends:"; cat deb-depends.txt; echo "rpm Requires:"; cat rpm-requires.txt
+          # 版本照 packaging/version.py 换的
+          got=$(dpkg-deb -f "$deb" Version); want=$(python3 packaging/version.py --expect deb)
+          test "$got" = "$want" || { echo "deb 的版本是 $got，该是 $want"; exit 1; }
+          got=$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$rpm"); want=$(python3 packaging/version.py --expect rpm)
+          test "$got" = "$want" || { echo "rpm 的版本是 $got，该是 $want"; exit 1; }
+          echo "deb $(dpkg-deb -f "$deb" Version)，rpm $got"
           if grep -i webkit deb-depends.txt rpm-requires.txt; then echo "还要 WebKitGTK"; exit 1; fi
           for want in libgtk-3-0 bubblewrap; do grep -qx "$want" deb-depends.txt || { echo "deb 少了 $want"; exit 1; }; done
           for want in gtk3 bubblewrap; do grep -qx "$want" rpm-requires.txt || { echo "rpm 少了 $want"; exit 1; }; done
@@ -165,7 +192,21 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $want = python -c "import tomllib; print(tomllib.load(open('pins.toml', 'rb'))['pwsh']['version'])"
+          $wantVersion = python packaging/version.py --expect msi
           foreach ($msi in Get-ChildItem out -Filter *.msi) {
+            # MSI 自己的版本（packaging/version.py 换的）
+            $installer = New-Object -ComObject WindowsInstaller.Installer
+            $db = $installer.GetType().InvokeMember('OpenDatabase', 'InvokeMethod', $null, $installer, @($msi.FullName, 0))
+            $view = $db.GetType().InvokeMember('OpenView', 'InvokeMethod', $null, $db, @("SELECT Value FROM Property WHERE Property = 'ProductVersion'"))
+            $view.GetType().InvokeMember('Execute', 'InvokeMethod', $null, $view, $null) | Out-Null
+            $record = $view.GetType().InvokeMember('Fetch', 'InvokeMethod', $null, $view, $null)
+            $gotVersion = $record.GetType().InvokeMember('StringData', 'GetProperty', $null, $record, 1)
+            $view.GetType().InvokeMember('Close', 'InvokeMethod', $null, $view, $null) | Out-Null
+            # 放掉数据库，后面的 msiexec /a 才打得开
+            foreach ($o in @($record, $view, $db, $installer)) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($o) | Out-Null }
+            [GC]::Collect(); [GC]::WaitForPendingFinalizers()
+            if ($gotVersion -ne $wantVersion) { throw "$($msi.Name)：MSI 的版本是 $gotVersion，该是 $wantVersion" }
+            Write-Output "$($msi.Name)：MSI 版本 $gotVersion"
             # 管理员安装只把文件解出来，不跑自定义步骤、不写注册表
             $x = Join-Path $env:RUNNER_TEMP $msi.BaseName
             $run = Start-Process msiexec.exe -ArgumentList @('/a', "`"$($msi.FullName)`"", '/qn', "TARGETDIR=`"$x`"") -Wait -PassThru
@@ -221,6 +262,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: 版本号
+        shell: bash
+        env:
+          WANT: ${{ inputs.version }}
+        run: |
+          py=python3; "$py" --version > /dev/null 2>&1 || py=python
+          "$py" packaging/version.py --check
+          if [ -n "$WANT" ]; then "$py" packaging/version.py --set "$WANT"; fi
       - name: 装托盘要的系统库
         if: runner.os == 'Linux'
         run: |
